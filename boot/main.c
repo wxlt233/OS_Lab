@@ -39,6 +39,7 @@ void
 bootmain(void)
 {
 	struct Proghdr *ph, *eph;
+        
 
 	// read 1st page off disk
 	readseg((uint32_t) ELFHDR, SECTSIZE*8, 0);
@@ -76,7 +77,7 @@ readseg(uint32_t pa, uint32_t count, uint32_t offset)
 	end_pa = pa + count;
 
 	// round down to sector boundary
-	pa &= ~(SECTSIZE - 1);
+	pa &= ~(SECTSIZE - 1);    //set the final 9 bit to 0
 
 	// translate from bytes to sectors, and kernel starts at sector 1
 	offset = (offset / SECTSIZE) + 1;
