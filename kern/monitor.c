@@ -24,6 +24,7 @@ struct Command {
 static struct Command commands[] = {
 	{ "help", "Display this list of commands", mon_help },
 	{ "kerninfo", "Display information about the kernel", mon_kerninfo },
+	{"backtrace","stack backtrace",mon_backtrace}
 };
 
 /***** Implementations of basic kernel monitor commands *****/
@@ -58,6 +59,22 @@ int
 mon_backtrace(int argc, char **argv, struct Trapframe *tf)
 {
 	// Your code here.
+	cprintf("Stack backtrace:\n");
+	uint32_t ebp=read_ebp();
+	struct Eipdebuginfo info;
+	while (ebp!=0)
+	{
+		uint32_t  eip=*((uint32_t *)(ebp+4));
+		cprintf("  ebp %08x eip %08x args ",ebp,eip); //内存中地址为ebp+4的空间存储着该函数的返回地址，通常也在调用该函数的函数内部
+		uint32_t * ebpt=(uint32_t *)(ebp);   
+		cprintf("%08x %08x %08x %08x %08x\n",*(ebpt+2),*(ebpt+3),*(ebpt+4),*(ebpt+5),*(ebpt+6));
+		//本次函数调用的参数分别存储在地址为ebp+8,ebp+12,ebp+16……的内存中，实际参数个数不一定为5,由于ebpt为指向32位整数的指针
+		//所以每往上寻找一个参数只需加1 （sizeof(uint32_t)=4）	
+		debuginfo_eip(eip,&info);
+		//通过已有函数接口，传入eip，查询是哪个函数调用了当前函数及其详细信息
+		cprintf("    %s:%d: %.*s+%d\n",info.eip_file,info.eip_line,info.eip_fn_namelen,info.eip_fn_name,eip-info.eip_fn_addr);
+		ebp=*(ebpt);
+	}
 	return 0;
 }
 
@@ -114,8 +131,11 @@ monitor(struct Trapframe *tf)
 
 	cprintf("Welcome to the JOS kernel monitor!\n");
 	cprintf("Type 'help' for a list of commands.\n");
-
-
+//	int x=1,y=3,z=4;
+//	cprintf("x %d, y %x, z %d\n",x,y,z);
+//	unsigned int i=0x00646c72;
+//	cprintf("H%x Wo%s",57616,&i);
+//	cprintf("x=%d y=%d",3);
 	while (1) {
 		buf = readline("K> ");
 		if (buf != NULL)

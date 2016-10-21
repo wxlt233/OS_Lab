@@ -102,8 +102,9 @@ boot_alloc(uint32_t n)
 	// to a multiple of PGSIZE.
 	//
 	// LAB 2: Your code here.
-
-	return NULL;
+	result=nextfree;    //由于要返回该次分配内存的首地址(或n=0时返回下一个未分配页的首地址),在改变nextfree前先记录下,以便作为返回值.
+	nextfree=ROUNDUP(nextfree+n,PGSIZE);//将记录下一个未分配页的首地址的变量做相应的修改,地址要根据页大小对齐,所以要使用ROUNDUP
+	return result;
 }
 
 // Set up a two-level page table:
@@ -125,7 +126,7 @@ mem_init(void)
 	i386_detect_memory();
 
 	// Remove this line when you're ready to test this function.
-	panic("mem_init: This function is not finished\n");
+//	panic("mem_init: This function is not finished\n");
 
 	//////////////////////////////////////////////////////////////////////
 	// create initial page directory.
@@ -148,7 +149,10 @@ mem_init(void)
 	// array.  'npages' is the number of physical pages in memory.  Use memset
 	// to initialize all fields of each struct PageInfo to 0.
 	// Your code goes here:
-
+         
+	pages =(struct PageInfo *) boot_alloc(npages*sizeof(struct PageInfo));  //使用之前完成的boot_alloc函数为pages数组分配空间,大小
+										//为npages*每个结构PageInfo的大小
+	memset(pages,0,npages*sizeof(struct PageInfo));                         //根据要求将每个PageInfo赋值为0
 
 	//////////////////////////////////////////////////////////////////////
 	// Now that we've allocated the initial kernel data structures, we set
@@ -253,9 +257,32 @@ page_init(void)
 	// free pages!
 	size_t i;
 	for (i = 0; i < npages; i++) {
-		pages[i].pp_ref = 0;
-		pages[i].pp_link = page_free_list;
-		page_free_list = &pages[i];
+		if (i==0)
+		{
+			pages[i].pp_ref=1;                  //第0页已经被使用了用于保存real-mode IDT和BIOS相关的结构
+			pages[i].pp_link=NULL;
+		}
+		else if (i<npages_basemem)
+		{		
+			pages[i].pp_ref=0;                 //将[PGSIZE,npages_basemem*PGSIZE)物理内存对应的页,即第1页到npages_basemem-1页
+			pages[i].pp_link=page_free_list;   //设为可用,同时维护page_free_list链表
+			page_free_list=&pages[i];		
+		}
+		else if (i<(((uint32_t) boot_alloc(0)-KERNBASE)>>PGSHIFT))  //通过调用boot_alloc(0)来查看当前下一个可用页面的地址
+		{							    //减去KERNBASE转化为物理地址,通过右移PGSHIFT(12)位获得页号
+								            //这一段的内存被用来存放kernel及pages结构等,因而不可用.
+			pages[i].pp_ref=1;
+			pages[i].pp_link=page_free_list;
+		
+		}
+		else 
+		{
+			pages[i].pp_ref=0;                              //其余的物理内存均未被分配,可用,同时维护page_free_list链表
+			pages[i].pp_link=page_free_list;
+			page_free_list=&pages[i];
+		}
+
+
 	}
 }
 
@@ -275,7 +302,19 @@ struct PageInfo *
 page_alloc(int alloc_flags)
 {
 	// Fill this function in
-	return 0;
+	if (!page_free_list)                        //如果当前没有可用页面,返回NULL
+	{
+		return NULL;
+	}
+	struct PageInfo *tt;
+	tt=page_free_list;                           //通过page_free_list指针找到一个为分配的页对应的Page_Info结构
+	page_free_list=page_free_list->pp_link;      //修改page_free_list
+	tt->pp_link=NULL;                            //根据要求将对应的pp_link设为NULL
+	if (alloc_flags&ALLOC_ZERO)                  //根据要求,若alloc_flags&ALLOC_ZERO,则将对应页设为0
+	{
+		memset(page2kva(tt),0,PGSIZE);	
+	}
+	return tt;
 }
 
 //
@@ -288,6 +327,13 @@ page_free(struct PageInfo *pp)
 	// Fill this function in
 	// Hint: You may want to panic if pp->pp_ref is nonzero or
 	// pp->pp_link is not NULL.
+	if (pp->pp_ref!=0||pp->pp_link!=NULL)              //假设当前页的pp_ref为1(仍在使用)或者pp_link==NULL(被分配),则发生错误,panic!
+	{
+		panic("error");
+	}
+	pp->pp_link=page_free_list;                        //将该页加入page_free_list所对应的链表中
+	page_free_list=pp;
+		
 }
 
 //

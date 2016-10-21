@@ -164,8 +164,13 @@ cga_putc(int c)
 {
 	// if no attribute given, then use black on white
 	if (!(c & ~0xFF))
-		c |= 0x0700;
-
+	{
+	if (((c&0xff)<='z'&&(c&0xff)>='a')||((c&0xff)<='Z'&&(c&0xff)>='A'))
+		c|=0x0900;
+	else if (((c&0xff)>='0'&&(c&0xff)<='9'))
+		c|=0x0200;
+	else c|=0x0700;
+	}
 	switch (c & 0xff) {
 	case '\b':
 		if (crt_pos > 0) {
