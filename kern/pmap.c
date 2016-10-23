@@ -373,7 +373,29 @@ pte_t *
 pgdir_walk(pde_t *pgdir, const void *va, int create)
 {
 	// Fill this function in
-	return NULL;
+//	pte_t *pagetableentry=NULL;
+	pte_t *pagetable=NULL;                  //对应page_table的指针
+	pde_t *pagedirectoryentry=NULL;         //对应page_directory中的PDE项的指针
+	pagedirectoryentry=&pgdir[PDX(va)];     //根据va的高10位,在page_directory中寻找对应的表项(PDE)
+	struct PageInfo * pp;                     
+	if (*pagedirectoryentry&PTE_P)          //如果对应表项存在,则对应page_table存在
+	{
+		pagetable=KADDR(PTE_ADDR(*pagedirectoryentry));  //根据表项获得对应page_table的物理地址,使用KADDR转换为虚拟地址
+	}
+	else if (!create)        //如果不存在且create==false,返回NULL
+	{
+		return NULL;
+	}
+	else 
+	{
+		pp=page_alloc(ALLOC_ZERO); 
+		if (pp==NULL)          //假设分配对应Page_table页时失败,返回NULL
+			return NULL; 
+		pp->pp_ref++;           //将对应页的引用计数加一
+		*pagedirectoryentry=page2pa(pp)|PTE_P|PTE_W|PTE_U; //将该页的物理地址放入page_directory中,设置标志位
+		pagetable=(pte_t *)page2kva(pp);  //得到该页的对应的虚拟地址,以便返回值使用
+	}
+	return &pagetable[PTX(va)];	//根据va的中间10位,在对应page_table中选择相应的PTE 返回
 }
 
 //
@@ -391,6 +413,16 @@ static void
 boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm)
 {
 	// Fill this function in
+	int i=0;
+	for (i=0;i<size/PGSIZE;i++)         //逐页设置映射
+	{
+		pte_t * pagetableentry=pgdir_walk(pgdir,(void *)(va+i*PGSIZE),1);  //寻找该虚拟内存对应的page table entry
+		if (!pagetableentry)   //假设返回NULL,由于已设置create!=0,说明page_alloc出错,panic
+		{
+			panic("page_alloc error!");
+		}
+		*pagetableentry=(pa+i*PGSIZE)|PTE_P|perm; //将对应物理地址及标志位填入虚拟内存对应的page_table_entry
+	}	
 }
 
 //
@@ -422,6 +454,28 @@ int
 page_insert(pde_t *pgdir, struct PageInfo *pp, void *va, int perm)
 {
 	// Fill this function in
+	pte_t *pagetableentry;
+	pagetableentry=pgdir_walk(pgdir,va,0);
+	if (pagetableentry)         //说明page directory中已有相应page table对应的PDE,
+	{
+		if (*pagetableentry&PTE_P)  //已有对应物理页
+		{
+			page_remove(pgdir,va);
+		}	
+	}
+	else
+	{
+		pagetableentry=pgdir_walk(pgdir,va,1); //根据要求,生成对应缺少的page table,并在page directory中添加相应的PDE
+		if (!pagetableentry)
+		{
+			return -E_NO_MEM;
+		}
+	}
+	if (pp==page_free_list)
+		page_free_list=page_free_list->pp_link;
+	*pagetableentry=page2pa(pp)|PTE_P|perm;
+	pp->pp_ref++;
+	tlb_invalidate(pgdir,va);
 	return 0;
 }
 
@@ -439,8 +493,19 @@ page_insert(pde_t *pgdir, struct PageInfo *pp, void *va, int perm)
 struct PageInfo *
 page_lookup(pde_t *pgdir, void *va, pte_t **pte_store)
 {
+	pte_t * pagetableentry=pgdir_walk(pgdir,va,0);   //使用pgdir_walk查找对应PTE,create设为0
+	if (!pagetableentry||!(*pagetableentry&PTE_P))//如果对应的PTE不存在,说明没有物理页被映射在了虚拟地址va上
+	{ 
+		return NULL;        
+	}
+	if (pte_store)
+	{
+		*pte_store=pagetableentry; //根据要求,将PTE的地址存在pte_store中
+	}
+	struct PageInfo * page=pa2page(PTE_ADDR(*pagetableentry)); //通过PTE得到对应的物理地址,使用pa2page得到对应的页
+	return page;
 	// Fill this function in
-	return NULL;
+
 }
 
 //
@@ -462,6 +527,16 @@ void
 page_remove(pde_t *pgdir, void *va)
 {
 	// Fill this function in
+	pte_t * pagetableentry=pgdir_walk(pgdir,va,0);//necessary???
+	pte_t **pte_store=&pagetableentry;
+	if (!pagetableentry)                        //说明对应的页表都不存在,PTE必然不存在,do nothing 
+		return ;
+	struct PageInfo* page=page_lookup(pgdir,va,pte_store); //使用page_lookup查找对应的page
+	if (!page)   //若不存在,do nothing
+		return;
+	page_decref(page);	//将对应物理页面的引用计数减一,若为0则释放,有page_decref函数完成
+	**pte_store=0;          //将对应PTE设为0
+	tlb_invalidate(pgdir,va);
 }
 
 //
