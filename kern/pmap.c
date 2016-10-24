@@ -176,7 +176,7 @@ mem_init(void)
 	//      (ie. perm = PTE_U | PTE_P)
 	//    - pages itself -- kernel RW, user NONE
 	// Your code goes here:
-
+	boot_map_region(kern_pgdir,UPAGES,ROUNDUP(sizeof(struct PageInfo )*npages,PGSIZE),PADDR(pages),PTE_U|PTE_P);
 	//////////////////////////////////////////////////////////////////////
 	// Use the physical memory that 'bootstack' refers to as the kernel
 	// stack.  The kernel stack grows down from virtual address KSTACKTOP.
@@ -188,7 +188,7 @@ mem_init(void)
 	//       overwrite memory.  Known as a "guard page".
 	//     Permissions: kernel RW, user NONE
 	// Your code goes here:
-
+	boot_map_region(kern_pgdir,KSTACKTOP-KSTKSIZE,ROUNDUP(KSTKSIZE,PGSIZE),PADDR(bootstack),PTE_P|PTE_W);
 	//////////////////////////////////////////////////////////////////////
 	// Map all of physical memory at KERNBASE.
 	// Ie.  the VA range [KERNBASE, 2^32) should map to
@@ -197,7 +197,7 @@ mem_init(void)
 	// we just set up the mapping anyway.
 	// Permissions: kernel RW, user NONE
 	// Your code goes here:
-
+	boot_map_region(kern_pgdir,KERNBASE,ROUNDUP(0xffffffff-KERNBASE,PGSIZE),0,PTE_P|PTE_W);
 	// Check that the initial page directory has been set up correctly.
 	check_kern_pgdir();
 
@@ -327,7 +327,7 @@ page_free(struct PageInfo *pp)
 	// Fill this function in
 	// Hint: You may want to panic if pp->pp_ref is nonzero or
 	// pp->pp_link is not NULL.
-	if (pp->pp_ref!=0||pp->pp_link!=NULL)              //假设当前页的pp_ref为1(仍在使用)或者pp_link==NULL(被分配),则发生错误,panic!
+	if (pp->pp_ref!=0||pp->pp_link!=NULL)              //假设当前页的pp_ref为1(仍在使用)或者pp_link!=NULL(未被分配),则发生错误,panic!
 	{
 		panic("error");
 	}
@@ -392,7 +392,7 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
 		if (pp==NULL)          //假设分配对应Page_table页时失败,返回NULL
 			return NULL; 
 		pp->pp_ref++;           //将对应页的引用计数加一
-		*pagedirectoryentry=page2pa(pp)|PTE_P|PTE_W|PTE_U; //将该页的物理地址放入page_directory中,设置标志位
+		*pagedirectoryentry=page2pa(pp)|PTE_P|PTE_W|PTE_U; //将该页的物理地址放入page_directory中,设置标志位//标志位存疑
 		pagetable=(pte_t *)page2kva(pp);  //得到该页的对应的虚拟地址,以便返回值使用
 	}
 	return &pagetable[PTX(va)];	//根据va的中间10位,在对应page_table中选择相应的PTE 返回
@@ -466,14 +466,14 @@ page_insert(pde_t *pgdir, struct PageInfo *pp, void *va, int perm)
 	else
 	{
 		pagetableentry=pgdir_walk(pgdir,va,1); //根据要求,生成对应缺少的page table,并在page directory中添加相应的PDE
-		if (!pagetableentry)
+		if (!pagetableentry)                   //假设分配失败
 		{
 			return -E_NO_MEM;
 		}
 	}
 	if (pp==page_free_list)
-		page_free_list=page_free_list->pp_link;
-	*pagetableentry=page2pa(pp)|PTE_P|perm;
+		page_free_list=page_free_list->pp_link;  //如果pp刚刚被释放,进行处理
+	*pagetableentry=page2pa(pp)|PTE_P|perm;         //设置对应PTE
 	pp->pp_ref++;
 	tlb_invalidate(pgdir,va);
 	return 0;
@@ -536,6 +536,7 @@ page_remove(pde_t *pgdir, void *va)
 		return;
 	page_decref(page);	//将对应物理页面的引用计数减一,若为0则释放,有page_decref函数完成
 	**pte_store=0;          //将对应PTE设为0
+//	*pagetableentry=0;
 	tlb_invalidate(pgdir,va);
 }
 
