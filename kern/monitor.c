@@ -24,7 +24,8 @@ struct Command {
 static struct Command commands[] = {
 	{ "help", "Display this list of commands", mon_help },
 	{ "kerninfo", "Display information about the kernel", mon_kerninfo },
-	{"backtrace","stack backtrace",mon_backtrace}
+	{"backtrace","stack backtrace",mon_backtrace},
+	{"showmappings","display physical mappings about a certain range",mon_showmappings}
 };
 
 /***** Implementations of basic kernel monitor commands *****/
@@ -78,6 +79,77 @@ mon_backtrace(int argc, char **argv, struct Trapframe *tf)
 	return 0;
 }
 
+
+void processflag(pte_t pagetableentry)
+{
+	cprintf("--");
+	if (pagetableentry&PTE_D)
+		cprintf("D");
+	else 
+		cprintf("-");
+	if (pagetableentry&PTE_A)
+		cprintf("A");
+	else 
+		cprintf("-");
+	cprintf("--");
+	if (pagetableentry&PTE_U)
+		cprintf("U");
+	else 
+		cprintf("-");
+	if (pagetableentry&PTE_W)
+		cprintf("W");
+	else 
+		cprintf("-");
+	cprintf("P");
+}
+
+extern pde_t * kern_pgdir;
+int mon_showmappings(int argc,char **argv,struct Trapframe *tf)
+{
+	char *endptr;
+	uintptr_t  vabegin=strtol(argv[1],&endptr,16);
+	if (*endptr)
+	{
+		cprintf("format error!\n");
+	}
+	uintptr_t vaend=strtol(argv[2],&endptr,16);
+	if (*endptr)
+	{
+		cprintf("format error!\n");
+	}
+	cprintf("va range ,     entry,  flag ,  pa range\n");
+	//现将字符串转为2个地址
+	while (vabegin<vaend)
+	{
+
+		pde_t pagedirectoryentry=kern_pgdir[PDX(vabegin)];  //根据起始地址找到page directory 中对应的PDE
+		cprintf("[%08x %08x]  ,",vabegin,((PDX(vabegin)+1)<<22)-1);  //打印该PDE包括的虚拟地址
+		cprintf("  PDE[%x]  ",PDX(vabegin));               //page directory 中对应的第几项
+		processflag(pagedirectoryentry);                   //处理标志位
+	/*	if (vabegin>=KERNBASE)
+		{
+			cprintf("  [%08x %08x]\n",vabegin-KERNBASE,vabegin-KERNBASE+PTSIZE-1);
+			vabegin+=PTSIZE;
+			continue;
+		}*/
+		cprintf("\n");
+		int i=0;
+		pte_t * pagetable=(pte_t *)(PTE_ADDR(pagedirectoryentry)+KERNBASE); //根据PDE_T表项中的物理地址找到对应的pagetable
+		for (i=PTX(vabegin);i<1024&&vabegin<vaend;i++) //遍历对应的PTE_T
+		{
+			pte_t thispagetableentry=pagetable[i];  
+			if (thispagetableentry&PTE_P)
+			{
+				cprintf("  [%08x %08x]  ",vabegin,vabegin+PGSIZE-1);
+				cprintf("  PTE[%03x]  ",PTX(vabegin));
+				processflag(thispagetableentry);
+				cprintf("  [%08x %08x]\n",PTE_ADDR(thispagetableentry),PTE_ADDR(thispagetableentry)+PGSIZE-1);
+			}
+			vabegin+=PGSIZE;	
+		}	
+	}
+	return 0;	
+}
 
 
 /***** Kernel monitor command interpreter *****/

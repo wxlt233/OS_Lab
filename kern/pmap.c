@@ -50,6 +50,7 @@ i386_detect_memory(void)
 		totalmem = basemem;
 
 	npages = totalmem / (PGSIZE / 1024);
+//	cprintf("npages is %d\n",npages);
 	npages_basemem = basemem / (PGSIZE / 1024);
 
 	cprintf("Physical memory: %uK available, base = %uK, extended = %uK\n",
@@ -95,6 +96,7 @@ boot_alloc(uint32_t n)
 	if (!nextfree) {
 		extern char end[];
 		nextfree = ROUNDUP((char *) end, PGSIZE);
+//		cprintf("%x\n",nextfree);
 	}
 
 	// Allocate a chunk large enough to hold 'n' bytes, then update
@@ -131,6 +133,7 @@ mem_init(void)
 	//////////////////////////////////////////////////////////////////////
 	// create initial page directory.
 	kern_pgdir = (pde_t *) boot_alloc(PGSIZE);
+//	cprintf("kern_pgdir%x\n",kern_pgdir);
 	memset(kern_pgdir, 0, PGSIZE);
 
 	//////////////////////////////////////////////////////////////////////
@@ -141,17 +144,21 @@ mem_init(void)
 
 	// Permissions: kernel R, user R
 	kern_pgdir[PDX(UVPT)] = PADDR(kern_pgdir) | PTE_U | PTE_P;
-
+	//UVPT开始的4M对应的pagetable(也即对应一个PDE)为KERN_PGDIR开始的一个页
+	//kern_pgdir中每个PDE_T 对应UVPT区域内的一个页(pagetable)
+	//UVPT开始的4M存页表,kern_pgdir开始的一页为PAGE DIRECTORY 
 	//////////////////////////////////////////////////////////////////////
 	// Allocate an array of npages 'struct PageInfo's and store it in 'pages'.
 	// The kernel uses this array to keep track of physical pages: for
-	// each physical page, there is a corresponding struct PageInfo in this
+	// each physical page, there is a corresponding struct PageInfo in thiis
 	// array.  'npages' is the number of physical pages in memory.  Use memset
 	// to initialize all fields of each struct PageInfo to 0.
 	// Your code goes here:
          
 	pages =(struct PageInfo *) boot_alloc(npages*sizeof(struct PageInfo));  //使用之前完成的boot_alloc函数为pages数组分配空间,大小
 										//为npages*每个结构PageInfo的大小
+//	cprintf("%d\n",npages);
+//	cprintf("%x\n",pages);
 	memset(pages,0,npages*sizeof(struct PageInfo));                         //根据要求将每个PageInfo赋值为0
 
 	//////////////////////////////////////////////////////////////////////
@@ -177,6 +184,8 @@ mem_init(void)
 	//    - pages itself -- kernel RW, user NONE
 	// Your code goes here:
 	boot_map_region(kern_pgdir,UPAGES,ROUNDUP(sizeof(struct PageInfo )*npages,PGSIZE),PADDR(pages),PTE_U|PTE_P);
+	cprintf("%x\n",sizeof(struct PageInfo)*npages);
+	//根据要求,将pages数组所在的物理页映射到线性地址UPAGES上,设置标志位为PTE_U|PTE_P
 	//////////////////////////////////////////////////////////////////////
 	// Use the physical memory that 'bootstack' refers to as the kernel
 	// stack.  The kernel stack grows down from virtual address KSTACKTOP.
@@ -188,7 +197,9 @@ mem_init(void)
 	//       overwrite memory.  Known as a "guard page".
 	//     Permissions: kernel RW, user NONE
 	// Your code goes here:
+//	cprintf("%x\n",bootstack);
 	boot_map_region(kern_pgdir,KSTACKTOP-KSTKSIZE,ROUNDUP(KSTKSIZE,PGSIZE),PADDR(bootstack),PTE_P|PTE_W);
+	//根据要求,只需将物理地址映射到虚拟地址[KSTACKTOP-KSTKSIZE,KSTACKTOP]上,权限为PTE_P|PTE_W
 	//////////////////////////////////////////////////////////////////////
 	// Map all of physical memory at KERNBASE.
 	// Ie.  the VA range [KERNBASE, 2^32) should map to
@@ -198,6 +209,7 @@ mem_init(void)
 	// Permissions: kernel RW, user NONE
 	// Your code goes here:
 	boot_map_region(kern_pgdir,KERNBASE,ROUNDUP(0xffffffff-KERNBASE,PGSIZE),0,PTE_P|PTE_W);
+	//根据要求,将0开始的物理地址映射到虚拟地址KERNBASE开始,大小为2^32-KERNBASE
 	// Check that the initial page directory has been set up correctly.
 	check_kern_pgdir();
 
@@ -392,7 +404,7 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
 		if (pp==NULL)          //假设分配对应Page_table页时失败,返回NULL
 			return NULL; 
 		pp->pp_ref++;           //将对应页的引用计数加一
-		*pagedirectoryentry=page2pa(pp)|PTE_P|PTE_W|PTE_U; //将该页的物理地址放入page_directory中,设置标志位//标志位存疑
+		*pagedirectoryentry=page2pa(pp)|PTE_P|PTE_W|PTE_U; //将该页的物理地址放入page_directory中,设置标志位
 		pagetable=(pte_t *)page2kva(pp);  //得到该页的对应的虚拟地址,以便返回值使用
 	}
 	return &pagetable[PTX(va)];	//根据va的中间10位,在对应page_table中选择相应的PTE 返回
