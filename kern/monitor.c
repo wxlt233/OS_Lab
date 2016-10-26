@@ -118,35 +118,51 @@ int mon_showmappings(int argc,char **argv,struct Trapframe *tf)
 		cprintf("format error!\n");
 	}
 	cprintf("va range ,     entry,  flag ,  pa range\n");
-	//现将字符串转为2个地址
-	while (vabegin<vaend)
+	//将字符串转为2个地址
+	bool pan=0;
+	while ((vabegin<vaend)&&!pan)
 	{
 
 		pde_t pagedirectoryentry=kern_pgdir[PDX(vabegin)];  //根据起始地址找到page directory 中对应的PDE
-		cprintf("[%08x %08x]  ,",vabegin,((PDX(vabegin)+1)<<22)-1);  //打印该PDE包括的虚拟地址
-		cprintf("  PDE[%x]  ",PDX(vabegin));               //page directory 中对应的第几项
-		processflag(pagedirectoryentry);                   //处理标志位
-	/*	if (vabegin>=KERNBASE)
+		if  (pagedirectoryentry&PTE_P)  //假设该PTSIZE虚拟内存对应的page table 存在
 		{
-			cprintf("  [%08x %08x]\n",vabegin-KERNBASE,vabegin-KERNBASE+PTSIZE-1);
-			vabegin+=PTSIZE;
-			continue;
-		}*/
-		cprintf("\n");
-		int i=0;
-		pte_t * pagetable=(pte_t *)(PTE_ADDR(pagedirectoryentry)+KERNBASE); //根据PDE_T表项中的物理地址找到对应的pagetable
-		for (i=PTX(vabegin);i<1024&&vabegin<vaend;i++) //遍历对应的PTE_T
-		{
-			pte_t thispagetableentry=pagetable[i];  
-			if (thispagetableentry&PTE_P)
+			cprintf("[%08x %08x]  ,",vabegin,((PDX(vabegin)+1)<<22)-1);  //打印该PDE包括的虚拟地址
+			cprintf("  PDE[%x]  ",PDX(vabegin));               //page directory 中对应的第几项
+			processflag(pagedirectoryentry);                   //处理标志位
+			if (vabegin>=KERNBASE)
 			{
-				cprintf("  [%08x %08x]  ",vabegin,vabegin+PGSIZE-1);
-				cprintf("  PTE[%03x]  ",PTX(vabegin));
-				processflag(thispagetableentry);
-				cprintf("  [%08x %08x]\n",PTE_ADDR(thispagetableentry),PTE_ADDR(thispagetableentry)+PGSIZE-1);
+				cprintf("  [%08x %08x]\n",vabegin-KERNBASE,vabegin-KERNBASE+PTSIZE-1);
+				uintptr_t vainit;
+				vainit=vabegin;   //由于处理高地址如0xfffff000时再加PGSIZE会导致整数上溢,加此判断
+				vabegin+=PTSIZE;
+				if (vainit>vabegin)  //若vabegin+PGSIZE<vabegin,则说明vabegin已超过0xffffffff(32位无符号数的上限,溢出,同时也							   说明已到达虚拟地址最高处,可以结束循环)
+				{
+					pan=1;
+				}
+				continue;
 			}
-			vabegin+=PGSIZE;	
-		}	
+			cprintf("\n");
+			int i=0;
+			pte_t * pagetable=(pte_t *)(PTE_ADDR(pagedirectoryentry)+KERNBASE); //根据PDE_T表项中的物理地址找到对应的pagetable
+//			cprintf("%08x\n",pagetable);
+			for (i=PTX(vabegin);i<1024&&vabegin<vaend;i++) //遍历对应的PTE_T
+			{
+				pte_t thispagetableentry=pagetable[i];   //找到page table中对应的项
+				if (thispagetableentry&PTE_P)    //如果对应的物理页面存在
+				{
+					cprintf("  [%08x %08x]  ",vabegin,vabegin+PGSIZE-1);
+					cprintf("  PTE[%03x]  ",PTX(vabegin));
+					processflag(thispagetableentry);
+					cprintf("  [%08x %08x]\n",PTE_ADDR(thispagetableentry),PTE_ADDR(thispagetableentry)+PGSIZE-1);
+				}
+				vabegin+=PGSIZE;		
+			}
+		}
+		else 
+		{
+			vabegin=((PDX(vabegin)+1)<<22);	 //若该PTSIZE对应的page table不存在,则说明该PTSIZE的虚拟内存没有被映射到物理内存
+							//直接跳到下一个PTSIZE的虚拟内存
+		}
 	}
 	return 0;	
 }

@@ -184,7 +184,7 @@ mem_init(void)
 	//    - pages itself -- kernel RW, user NONE
 	// Your code goes here:
 	boot_map_region(kern_pgdir,UPAGES,ROUNDUP(sizeof(struct PageInfo )*npages,PGSIZE),PADDR(pages),PTE_U|PTE_P);
-	cprintf("%x\n",sizeof(struct PageInfo)*npages);
+	//cprintf("%x\n",sizeof(struct PageInfo)*npages);
 	//根据要求,将pages数组所在的物理页映射到线性地址UPAGES上,设置标志位为PTE_U|PTE_P
 	//////////////////////////////////////////////////////////////////////
 	// Use the physical memory that 'bootstack' refers to as the kernel
@@ -208,6 +208,22 @@ mem_init(void)
 	// we just set up the mapping anyway.
 	// Permissions: kernel RW, user NONE
 	// Your code goes here:
+
+//	code for challenge 1
+/*	uint32_t cr4;
+	cr4=rcr4(); //读取CR4寄存器的值
+	cr4|=CR4_PSE;//开启CR4寄存器中的PSE标志位
+	lcr4(cr4);//将修改后的值装入CR4寄存器
+	uintptr_t vabegin=KERNBASE; //虚拟地址从KERNBASE开始
+	physaddr_t pabegin=0; //物理地址从0开始
+	int i=0;
+	for (i=0;i<64;i++) //共有256MB,每4MB对应一个PDE_T表项
+	{
+		kern_pgdir[PDX(vabegin)]=pabegin|PTE_PS|PTE_P|PTE_W; //在PDE中填入对应表项
+		vabegin+=PTSIZE; //每次映射PTSIZE(4MB)
+		pabegin+=PTSIZE;
+	}*/      
+	
 	boot_map_region(kern_pgdir,KERNBASE,ROUNDUP(0xffffffff-KERNBASE,PGSIZE),0,PTE_P|PTE_W);
 	//根据要求,将0开始的物理地址映射到虚拟地址KERNBASE开始,大小为2^32-KERNBASE
 	// Check that the initial page directory has been set up correctly.
