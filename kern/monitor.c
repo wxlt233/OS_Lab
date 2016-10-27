@@ -26,7 +26,9 @@ static struct Command commands[] = {
 	{ "kerninfo", "Display information about the kernel", mon_kerninfo },
 	{"backtrace","stack backtrace",mon_backtrace},
 	{"showmappings","display physical mappings about a certain range",mon_showmappings},
-	{"setclearpermission","set or clear permisssion of any  mapping",mon_setclear}
+	{"setclearpermission","set or clear permisssion of any  mapping",mon_setclear},
+	{"x","show the content of the corresponding virtual memory",mon_showvirtualmemory},
+	{"xp","show the content of the corresponding physical memory",mon_showphysicalmemory}
 };
 
 /***** Implementations of basic kernel monitor commands *****/
@@ -211,6 +213,78 @@ int mon_setclear(int argc,char **argv,struct Trapframe *tf)
 	return 0;
 }
 
+
+int mon_showvirtualmemory(int argc,char **argv,struct Trapframe *tf)
+{
+	if (argc!=3) //检查参数,与qemu monitor和gdb类似,该功能打印从虚拟地址addr开始的n个单元的内容(默认每单元4字节)
+	{
+		cprintf("this function takes exactly 2 parameters,for example\n");
+		cprintf("x 10 0xf0000000\n");
+		cprintf("means show the content of virtual address 0xf000000 for 10 units(4 bytes per unit like the qemu monitor)\n");
+		return 0;
+	}
+	char *endptr;
+	uintptr_t  va=strtol(argv[2],&endptr,16);
+	if (*endptr)
+	{
+		cprintf("format error!\n");
+		return 0;
+	}
+	int n=strtol(argv[1],&endptr,10);
+	if (*endptr)
+	{
+		cprintf("format error!\n");
+		return 0;
+	}
+	uint32_t * vapointer=(uint32_t *)va;
+	int i=0;              
+	for (i=0;i<n;i++)       //从指定虚拟地址开始,打印内存
+	{
+		if (i!=0&&i%4==0)   
+			cprintf("\n");
+		cprintf("0x%08x ",*vapointer);
+		vapointer++; //指针指向下一个4字节
+	}
+	cprintf("\n");	
+	return 0;
+}
+
+int mon_showphysicalmemory(int argc,char **argv,struct Trapframe *tf)
+{
+	if (argc!=3) //检查参数,与qemu monitor的xp功能类似,打印物理地址addr开始的n个4字节内容
+	{
+		cprintf("this function takes exactly 2 parameters,for example\n");
+		cprintf("xp 10 0x00000000\n");
+		cprintf("means show the content of physical address 0x0000000 for 10 units(4 bytes per unit like the qemu monitor)\n");
+		return 0;
+	}
+	char *endptr;
+	physaddr_t pa=strtol(argv[2],&endptr,16);	
+	if (*endptr)
+	{
+		cprintf("format error!\n");
+		return 0;
+	}	
+	int n=strtol(argv[1],&endptr,10);
+	if (*endptr)
+	{
+		cprintf("format error!\n");
+		return 0;
+	}
+	int i=0;
+	uint32_t *vapointer=(uint32_t *)(KERNBASE+pa); //由于程序只能直接访问虚拟地址,进行虚拟地址到物理地址的转换
+	for (i=0;i<n;i++)        
+	{
+		if (i!=0&&i%4==0)
+		{
+			cprintf("\n");
+		}
+		cprintf("0x%08x ",*vapointer);
+		vapointer++;	 //指针指向下一个4字节	
+	}
+	cprintf("\n");	
+	return 0;
+}
 
 /***** Kernel monitor command interpreter *****/
 

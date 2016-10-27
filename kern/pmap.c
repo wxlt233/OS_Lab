@@ -555,7 +555,7 @@ void
 page_remove(pde_t *pgdir, void *va)
 {
 	// Fill this function in
-	pte_t * pagetableentry=pgdir_walk(pgdir,va,0);//necessary???
+	pte_t * pagetableentry=pgdir_walk(pgdir,va,0);
 	pte_t **pte_store=&pagetableentry;
 	if (!pagetableentry)                        //说明对应的页表都不存在,PTE必然不存在,do nothing 
 		return ;
