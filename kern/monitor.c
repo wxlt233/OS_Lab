@@ -25,7 +25,8 @@ static struct Command commands[] = {
 	{ "help", "Display this list of commands", mon_help },
 	{ "kerninfo", "Display information about the kernel", mon_kerninfo },
 	{"backtrace","stack backtrace",mon_backtrace},
-	{"showmappings","display physical mappings about a certain range",mon_showmappings}
+	{"showmappings","display physical mappings about a certain range",mon_showmappings},
+	{"setclearpermission","set or clear permisssion of any  mapping",mon_setclear}
 };
 
 /***** Implementations of basic kernel monitor commands *****/
@@ -129,11 +130,11 @@ int mon_showmappings(int argc,char **argv,struct Trapframe *tf)
 			cprintf("[%08x %08x]  ,",vabegin,((PDX(vabegin)+1)<<22)-1);  //打印该PDE包括的虚拟地址
 			cprintf("  PDE[%x]  ",PDX(vabegin));               //page directory 中对应的第几项
 			processflag(pagedirectoryentry);                   //处理标志位
-			if (vabegin>=KERNBASE)
+			if (vabegin>=KERNBASE)  //由于KERNBASE上的虚拟内存到物理内存的映射均为-KERNBASE,只打印PDE,更为简洁且不损失信息
 			{
 				cprintf("  [%08x %08x]\n",vabegin-KERNBASE,vabegin-KERNBASE+PTSIZE-1);
 				uintptr_t vainit;
-				vainit=vabegin;   //由于处理高地址如0xfffff000时再加PGSIZE会导致整数上溢,加此判断
+				vainit=vabegin;   //由于处理高地址如0xffc00000时再加PTSIZE会导致整数上溢,加此判断
 				vabegin+=PTSIZE;
 				if (vainit>vabegin)  //若vabegin+PGSIZE<vabegin,则说明vabegin已超过0xffffffff(32位无符号数的上限,溢出,同时也							   说明已到达虚拟地址最高处,可以结束循环)
 				{
@@ -144,7 +145,6 @@ int mon_showmappings(int argc,char **argv,struct Trapframe *tf)
 			cprintf("\n");
 			int i=0;
 			pte_t * pagetable=(pte_t *)(PTE_ADDR(pagedirectoryentry)+KERNBASE); //根据PDE_T表项中的物理地址找到对应的pagetable
-//			cprintf("%08x\n",pagetable);
 			for (i=PTX(vabegin);i<1024&&vabegin<vaend;i++) //遍历对应的PTE_T
 			{
 				pte_t thispagetableentry=pagetable[i];   //找到page table中对应的项
@@ -165,6 +165,50 @@ int mon_showmappings(int argc,char **argv,struct Trapframe *tf)
 		}
 	}
 	return 0;	
+}
+
+
+int mon_setclear(int argc,char **argv,struct Trapframe *tf)
+{
+	//cprintf("%d\n",argc);
+	if (argc!=4)   //检查参数个数,输出提示
+	{ 
+		cprintf("this function takes 3 parameter,for example:\n");
+		cprintf("0xf0000000 1 U\n");
+		cprintf("the first parameter shows the address\nsecond parameter means clear(0) or set(1)\nthe third can be 'U' or 'W' or 'P' corresponding to each flag\n");
+		return 0;
+	}
+	char *endptr;
+	uintptr_t  va=strtol(argv[1],&endptr,16);
+	if (*endptr)
+	{
+		cprintf("format error!\n");
+		return 0; 
+	}                    //将字符串转化为地址
+	pde_t pagedirectoryentry=kern_pgdir[PDX(va)]; // 取得该地址对应的Pagedirectoryentry
+	if (pagedirectoryentry&PTE_P)  //假设该PDE存在 
+	{
+		pte_t *pagetable=(pte_t *)(PTE_ADDR(pagedirectoryentry)+KERNBASE); //取对应的page table
+		pte_t *  pagetableentry=&pagetable[PTX(va)]; //在page table中找到对应的Page table entry
+		if (*pagetableentry&PTE_P) //假设要修改的PTE存在 
+		{                          //根据传入参数修改标志位
+			if (argv[2][0]=='1')
+			{
+				if (argv[3][0]=='U') *pagetableentry|=PTE_U;
+				if (argv[3][0]=='P') *pagetableentry|=PTE_P;
+				if (argv[3][0]=='W') *pagetableentry|=PTE_W;
+			}
+			else if (argv[2][0]=='0')
+			{
+				if (argv[3][0]=='U') *pagetableentry&=~PTE_U;
+				if (argv[3][0]=='P') *pagetableentry&=~PTE_P;
+				if (argv[3][0]=='W') *pagetableentry&=~PTE_W;
+			}	
+			return 0;
+		}
+	}
+	cprintf("this virtual address is not mapped to physical address");
+	return 0;
 }
 
 
