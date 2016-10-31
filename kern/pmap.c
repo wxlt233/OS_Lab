@@ -355,6 +355,7 @@ page_alloc(int alloc_flags)
 	{
 		memset(page2kva(tt),0,PGSIZE);	
 	}
+//	cprintf("%d\n",ALLOC_ZERO);
 	return tt;
 }
 
