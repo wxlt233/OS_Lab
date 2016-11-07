@@ -218,7 +218,7 @@ env_alloc(struct Env **newenv_store, envid_t parent_id)
 	struct Env *e;
 
 	if (!(e = env_free_list))
-		return -E_NO_FREE_ENV;
+		return -E_NO_FREE_ENV;   
 
 	// Allocate and set up the page directory for this environment.
 	if ((r = env_setup_vm(e)) < 0)
@@ -278,14 +278,14 @@ region_alloc(struct Env *e, void *va, size_t len)
 	// LAB 3: Your code here.
 	// (But only if you need it for load_icode.)
 	int i=0;
-	for (i=ROUNDDOWN((uintptr_t )va,PGSIZE);i<ROUNDUP((uintptr_t  )(va+len),PGSIZE);i+=PGSIZE)
+	for (i=ROUNDDOWN((uintptr_t )va,PGSIZE);i<ROUNDUP((uintptr_t  )(va+len),PGSIZE);i+=PGSIZE)  //逐页分配
 	{
-		struct PageInfo*p=page_alloc(0);
-		if (!p)
+		struct PageInfo*p=page_alloc(0);        //分配一个新的页,由于不需要对该页进行初始清零等,alloc_flags参数为0
+		if (!p)                                 //如果返回值为NULL,说明分配失败,panic
 		{
 			panic("allocation error");
 		}
-		page_insert(e->env_pgdir,p,(void *)i,PTE_U|PTE_W);
+		page_insert(e->env_pgdir,p,(void *)i,PTE_U|PTE_W); //使用page_insert,将刚分配的物理页映射到虚拟地址
 	}	
 	
 
@@ -349,41 +349,41 @@ load_icode(struct Env *e, uint8_t *binary)
 	//  What?  (See env_run() and env_pop_tf() below.)
 
 	// LAB 3: Your code here.
-	lcr3(PADDR(e->env_pgdir));
-	struct Elf *user;
-	user=(struct Elf*) (binary);
-	if (user->e_magic!=ELF_MAGIC)
+	lcr3(PADDR(e->env_pgdir));//使用该environment的页目录
+	struct Elf *user;  
+	user=(struct Elf*) (binary);  
+	if (user->e_magic!=ELF_MAGIC)  //检查魔数
 		panic("this is not a binary file!");	
 	struct Proghdr *ph,*eph;
-	ph=(struct Proghdr*) ((uint8_t *)user+user->e_phoff);
-	eph=ph+user->e_phnum;
-	for (;ph<eph;ph++)
+	ph=(struct Proghdr*) ((uint8_t *)user+user->e_phoff);  //根据elf文件中程序头表的偏移量,找到对应程序头表
+	eph=ph+user->e_phnum;  //共有user->e_phnum个段
+	for (;ph<eph;ph++)  //遍历所有段
 	{
-		if (ph->p_type==ELF_PROG_LOAD)
+		if (ph->p_type==ELF_PROG_LOAD)  //如果该段可装载
 		{
-			region_alloc(e,(void *)ph->p_va,ph->p_memsz);
+			region_alloc(e,(void *)ph->p_va,ph->p_memsz); //为该environment分配对应ph->p_memsz的内存
 			int i=0;
 			char *va=(char *)(ph->p_va);
 			for (i=0;i<ph->p_filesz;i++)
 			{
-				va[i]=binary[ph->p_offset+i];
+				va[i]=binary[ph->p_offset+i];   //将ELF文件中的可装载段的内容加载至对应内存
 			}
 			for (i=ph->p_filesz;i<ph->p_memsz;i++)
 			{
-				va[i]=0;
+				va[i]=0;                        //将bss节清空
 			}
 				
 		}
 	}
 	// Now map one page for the program's initial stack
 	// at virtual address USTACKTOP - PGSIZE.	
-	struct PageInfo *p=page_alloc(0);
+	struct PageInfo *p=page_alloc(0);                   
 	if (!p)
 		panic("allocation fail!");
-	page_insert(e->env_pgdir,p,(void *)USTACKTOP-PGSIZE,PTE_U|PTE_W);	
+	page_insert(e->env_pgdir,p,(void *)USTACKTOP-PGSIZE, PTE_U|PTE_W);	   //为该用户程序分配栈空间
 	// LAB 3: Your code here.
-	e->env_tf.tf_eip=user->e_entry;
-	lcr3(PADDR(kern_pgdir));
+	e->env_tf.tf_eip=user->e_entry;                //设置该程序起始地址
+	lcr3(PADDR(kern_pgdir));                       //将CR3寄存器的内容换为原先的kern_pgdir
 }
 
 //
@@ -398,14 +398,14 @@ env_create(uint8_t *binary, enum EnvType type)
 {
 	// LAB 3: Your code here.
 	struct Env *e;
-	if (!env_alloc(&e,0))
+	if (!env_alloc(&e,0))    // 使用env_alloc进行分配
 	{
-		e->env_type=type;
-		load_icode(e,binary);	
+		e->env_type=type;   //设置该env对应的类型
+		load_icode(e,binary);	 //加载对应二进制文件
 	}
 	else 
 	{
-		panic("env_alloc error");
+		panic("env_alloc error"); //如果分配失败,panic
 	}
 }
 
@@ -523,16 +523,16 @@ env_run(struct Env *e)
 	//	e->env_tf to sensible values.
 
 	// LAB 3: Your code here.
-	if (curenv!=NULL)
+	if (curenv!=NULL)       //判断当前是否有其env在运行
 	{
-		if (curenv->env_status==ENV_RUNNING)
+		if (curenv->env_status==ENV_RUNNING)  //根据要求,如果当前environment的状态为RUNNING,将其该为RUNNABLE
 			curenv->env_status=ENV_RUNNABLE;
 	}
-	curenv=e;
-	curenv->env_status=ENV_RUNNING;
-	curenv->env_runs++;
-	lcr3(PADDR(e->env_pgdir));
-	env_pop_tf(&e->env_tf);
+	curenv=e;               //将当前environment设为对应的e 
+	curenv->env_status=ENV_RUNNING; //修改状态为RUNNING
+	curenv->env_runs++;      //更新计数器值
+	lcr3(PADDR(e->env_pgdir));  //将e->env_pgdir装入CR3寄存器,从而切换至该environment对应的地址空间
+	env_pop_tf(&e->env_tf);    //
 //	panic("env_run not yet implemented");
 }
 
