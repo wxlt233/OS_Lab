@@ -199,6 +199,8 @@ mem_init(void)
 	//    - envs itself -- kernel RW, user NONE
 	// LAB 3: Your code here.
 	boot_map_region(kern_pgdir,UENVS,ROUNDUP(sizeof(struct Env)*NENV,PGSIZE),PADDR(envs),PTE_U|PTE_P);
+
+	//根据要求,将envs数组映射至线性地址UENVS处,权限为用户可读
 	//////////////////////////////////////////////////////////////////////
 	// Use the physical memory that 'bootstack' refers to as the kernel
 	// stack.  The kernel stack grows down from virtual address KSTACKTOP.
@@ -618,13 +620,15 @@ int
 user_mem_check(struct Env *env, const void *va, size_t len, int perm)
 {
 	// LAB 3: Your code here.
-	uint32_t vabegin=(uint32_t )ROUNDDOWN(va,PGSIZE);
+	uint32_t vabegin=(uint32_t )ROUNDDOWN(va,PGSIZE);   //按页对齐,确认起始和终止边界
 	uint32_t vaend=(uint32_t )ROUNDUP(va+len,PGSIZE);
 	uint32_t i;
-	for (i=vabegin;i<vaend;i+=PGSIZE)
+	for (i=vabegin;i<vaend;i+=PGSIZE)           //逐页判断
 	{
-		pte_t * pagetable=pgdir_walk(env->env_pgdir,(void *)i,0);	
+		pte_t * pagetable=pgdir_walk(env->env_pgdir,(void *)i,0); //找到该页对应的pagetable entry	
 		if (i>ULIM||!pagetable||!(*pagetable&PTE_P)||((*pagetable&perm)!=perm))
+		//如果该地址大于ULIM(属于内核)或者对应的pagetable entry不存在(没有映射)或者权限不够
+		//则检查出错误
 		{
 			if (i>(uint32_t )va)
 				user_mem_check_addr=i;

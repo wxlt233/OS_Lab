@@ -122,7 +122,8 @@ env_init(void)
 		envs[i].env_id=0;        //根据要求,将envs_ids设为0,进行初始化
 		if (i!=NENV-1)
 		{
-			envs[i].env_link=&envs[i+1]; //由于要求environments在free_list中的顺序与在envs数组中顺序相同,每个envs[i]的env_link指向envs[i+1]
+			envs[i].env_link=&envs[i+1]; 
+	//由于要求environments在free_list中的顺序与在envs数组中顺序相同,每个envs[i]的env_link指向envs[i+1]
 		}
 	}
 	env_free_list=&envs[0]; //env_free_list指向envs数组的第一个
@@ -191,13 +192,15 @@ env_setup_vm(struct Env *e)
 	e->env_pgdir=page2kva(p);
 	for (i=PDX(UTOP);i<1024;i++)
 	{
-		e->env_pgdir[i]=kern_pgdir[i];
+		e->env_pgdir[i]=kern_pgdir[i];    
+		//由于UTOP及以上的地址对于各个进程及kernel均相同,所以之间使用Kern_pgdir即可
 	}
-	p->pp_ref++;
+	p->pp_ref++;           //根据要求,修改引用次数
 	
 	// UVPT maps the env's own page table read-only.
 	// Permissions: kernel R, user R
-	e->env_pgdir[PDX(UVPT)] = PADDR(e->env_pgdir) | PTE_P | PTE_U;
+	e->env_pgdir[PDX(UVPT)] = PADDR(e->env_pgdir) | PTE_P | PTE_U;     
+	//将该environment自己的页表映射至该environment地址空间中UVPT处
 
 	return 0;
 }
@@ -355,18 +358,21 @@ load_icode(struct Env *e, uint8_t *binary)
 	if (user->e_magic!=ELF_MAGIC)  //检查魔数
 		panic("this is not a binary file!");	
 	struct Proghdr *ph,*eph;
-	ph=(struct Proghdr*) ((uint8_t *)user+user->e_phoff);  //根据elf文件中程序头表的偏移量,找到对应程序头表
-	eph=ph+user->e_phnum;  //共有user->e_phnum个段
+	ph=(struct Proghdr*) ((uint8_t *)user+user->e_phoff);  
+	//根据elf文件中程序头表的偏移量,找到对应程序头表
+	eph=ph+user->e_phnum;  	//共有user->e_phnum个段
 	for (;ph<eph;ph++)  //遍历所有段
 	{
 		if (ph->p_type==ELF_PROG_LOAD)  //如果该段可装载
 		{
-			region_alloc(e,(void *)ph->p_va,ph->p_memsz); //为该environment分配对应ph->p_memsz的内存
+			region_alloc(e,(void *)ph->p_va,ph->p_memsz); 
+			//为该environment分配对应ph->p_memsz的内存
 			int i=0;
 			char *va=(char *)(ph->p_va);
 			for (i=0;i<ph->p_filesz;i++)
 			{
-				va[i]=binary[ph->p_offset+i];   //将ELF文件中的可装载段的内容加载至对应内存
+				va[i]=binary[ph->p_offset+i];   
+				//将ELF文件中的可装载段的内容加载至对应内存
 			}
 			for (i=ph->p_filesz;i<ph->p_memsz;i++)
 			{
@@ -380,7 +386,8 @@ load_icode(struct Env *e, uint8_t *binary)
 	struct PageInfo *p=page_alloc(0);                   
 	if (!p)
 		panic("allocation fail!");
-	page_insert(e->env_pgdir,p,(void *)USTACKTOP-PGSIZE, PTE_U|PTE_W);	   //为该用户程序分配栈空间
+	page_insert(e->env_pgdir,p,(void *)USTACKTOP-PGSIZE, PTE_U|PTE_W);	   
+	//为该用户程序分配栈空间
 	// LAB 3: Your code here.
 	e->env_tf.tf_eip=user->e_entry;                //设置该程序起始地址
 	lcr3(PADDR(kern_pgdir));                       //将CR3寄存器的内容换为原先的kern_pgdir
@@ -525,13 +532,15 @@ env_run(struct Env *e)
 	// LAB 3: Your code here.
 	if (curenv!=NULL)       //判断当前是否有其env在运行
 	{
-		if (curenv->env_status==ENV_RUNNING)  //根据要求,如果当前environment的状态为RUNNING,将其该为RUNNABLE
+		if (curenv->env_status==ENV_RUNNING)  
+		//根据要求,如果当前environment的状态为RUNNING,将其该为RUNNABLE
 			curenv->env_status=ENV_RUNNABLE;
 	}
 	curenv=e;               //将当前environment设为对应的e 
 	curenv->env_status=ENV_RUNNING; //修改状态为RUNNING
 	curenv->env_runs++;      //更新计数器值
-	lcr3(PADDR(e->env_pgdir));  //将e->env_pgdir装入CR3寄存器,从而切换至该environment对应的地址空间
+	lcr3(PADDR(e->env_pgdir));  
+	//将e->env_pgdir装入CR3寄存器,从而切换至该environment对应的地址空间
 	env_pop_tf(&e->env_tf);    //
 //	panic("env_run not yet implemented");
 }

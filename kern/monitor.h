@@ -19,4 +19,6 @@ int mon_showmappings(int argc,char **argv,struct Trapframe *tf);
 int mon_setclear(int argc,char **argv,struct Trapframe *tf);
 int mon_showvirtualmemory(int argc,char **argv,struct Trapframe *tf);
 int mon_showphysicalmemory(int argc,char **argv,struct Trapframe *tf);
+int mon_singlestep(int argc,char **argv,struct Trapframe *tf);
+int mon_continue(int argc,char **argv,struct Trapframe *tf);
 #endif	// !JOS_KERN_MONITOR_H

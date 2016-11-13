@@ -46,8 +46,11 @@
 /*
  * Lab 3: Your code here for generating entry points for the different traps.
  */
-	TRAPHANDLER_NOEC(handler0,T_DIVIDE)
-	TRAPHANDLER_NOEC(handler1,T_DEBUG)
+	
+	//定义各类异常/中断处理函数,其中不需要压入错误码的使用TRAPHANDLER_NOEC
+	//需要压入错误码的使用TRAPHANDLER,两个参数分别为对应的函数名称及trapnumber
+	TRAPHANDLER_NOEC(handler0,T_DIVIDE)        
+	TRAPHANDLER_NOEC(handler1,T_DEBUG)         
 	TRAPHANDLER_NOEC(handler2,T_NMI)
 	TRAPHANDLER_NOEC(handler3,T_BRKPT)
 	TRAPHANDLER_NOEC(handler4,T_OFLOW)
@@ -71,14 +74,14 @@
  * Lab 3: Your code here for _alltraps
  */
  _alltraps:
-	pushl %ds
+	pushl %ds            //根据trapframe的结构,依次将ds,es及pushal所包含的通用寄存器压栈
 	pushl %es
-	pushal
+	pushal          
 	movl $GD_KD,%eax
-	mov %eax,%ds
+	mov %eax,%ds         //将段选择符装入DS和ES寄存器,GD_KD为内核数据段
 	mov %eax,%es
-	pushl %esp
-	call trap
+	pushl %esp           //将trapframe的地址(即esp)压栈,作为trap函数的参数
+	call trap            //调用trap函数进行进一步的异常/中断处理
 
 
 

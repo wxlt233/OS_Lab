@@ -93,10 +93,13 @@ trap_init(void)
 		
 	void handler48();
 
-	SETGATE(idt[0],0,GD_KT,handler0,0);	
-	SETGATE(idt[1],0,GD_KT,handler1,0);
-	SETGATE(idt[2],0,GD_KD,handler2,0);
-	SETGATE(idt[3],0,GD_KT,handler3,3);
+	//使用SETGATE填写对应的中断向量表IDT,参数分别为要填写的IDT表项, 是否为trap,
+	//段选择符GD_KT(内核代码段),对应函数地址及DPL
+	SETGATE(idt[0],0,GD_KT,handler0,0); 
+	SETGATE(idt[1],0,GD_KT,handler1,0); 
+	SETGATE(idt[2],0,GD_KT,handler2,0);
+	SETGATE(idt[3],0,GD_KT,handler3,3);  
+	//breakpoint对应的DPL应设置为3,从而可以触发breakpoint exception
 	SETGATE(idt[4],0,GD_KT,handler4,0);
 	SETGATE(idt[5],0,GD_KT,handler5,0);
 	SETGATE(idt[6],0,GD_KT,handler6,0);
@@ -192,20 +195,25 @@ trap_dispatch(struct Trapframe *tf)
 {
 	// Handle processor exceptions.
 	// LAB 3: Your code here.
-	if (tf->tf_trapno==T_PGFLT)
+	if (tf->tf_trapno==T_PGFLT)  //如果是page fault,分配给对应的page_fault_handler函数进行处理
 	{
 		page_fault_handler(tf);	
 		return;
 	}
-	else if (tf->tf_trapno==T_BRKPT)
+	else if (tf->tf_trapno==T_BRKPT) //如果是breakpoint,调用monitor
 	{
 		monitor(tf);
 		return;
 	}
-	else if (tf->tf_trapno==T_SYSCALL)
+	else if (tf->tf_trapno==T_SYSCALL) //如果是系统调用,调用syscall函数
 	{
 		tf->tf_regs.reg_eax=syscall(tf->tf_regs.reg_eax,tf->tf_regs.reg_edx,tf->tf_regs.reg_ecx,tf->tf_regs.reg_ebx,tf->tf_regs.reg_edi,tf->tf_regs.reg_esi);
 		return;	
+	}
+	else if (tf->tf_trapno==T_DEBUG) //如果是调试异常,调用monitor
+	{
+		monitor(tf);	
+		return;
 	}
 	// Unexpected trap: The user process or the kernel has a bug.
 	print_trapframe(tf);
@@ -267,7 +275,7 @@ page_fault_handler(struct Trapframe *tf)
 	// Handle kernel-mode page faults.
 
 	// LAB 3: Your code here.
-	if ((tf->tf_cs&0x11)==0)
+	if ((tf->tf_cs&0x11)==0)        //判断上一个trapframe中CS段选择符的RPL,从而判断是否在内核态发生的page fault   
 		panic("kernel page fault");
 	// We've already handled kernel-mode exceptions, so if we get here,
 	// the page fault happened in user mode.

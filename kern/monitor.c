@@ -29,7 +29,9 @@ static struct Command commands[] = {
 	{"showmappings","display physical mappings about a certain range",mon_showmappings},
 	{"setclearpermission","set or clear permisssion of any  mapping",mon_setclear},
 	{"x","show the content of the corresponding virtual memory",mon_showvirtualmemory},
-	{"xp","show the content of the corresponding physical memory",mon_showphysicalmemory}
+	{"xp","show the content of the corresponding physical memory",mon_showphysicalmemory},
+	{"si","single step one instruction at a time",mon_singlestep},
+	{"c","continue the execution of user environment",mon_continue}
 };
 
 /***** Implementations of basic kernel monitor commands *****/
@@ -81,6 +83,30 @@ mon_backtrace(int argc, char **argv, struct Trapframe *tf)
 		ebp=*(ebpt);
 	}
 	return 0;
+}
+
+
+int mon_singlestep(int argc,char **argv,struct Trapframe *tf)
+{
+	if (tf==NULL)
+	{
+		cprintf("no running user environment!");
+		return 1;
+	}
+	tf->tf_eflags|=FL_TF;    //将eflags中的标志位TF置1,开启单步跟踪
+	return -1;               //返回-1从而退出monitor,回到用户environment
+
+}
+
+int mon_continue(int argc,char **argv,struct Trapframe *tf)
+{
+	if (tf==NULL)
+	{
+		cprintf("no running user environment!");
+		return 1;
+	}
+	tf->tf_eflags&=~FL_TF;   //将eflags中的标志位TF清0,不再单步跟踪
+	return -1;               //返回-1从而推出monitor,回到用户environment
 }
 
 
