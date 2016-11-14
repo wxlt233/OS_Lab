@@ -565,6 +565,7 @@ env_run(struct Env *e)
 	curenv=e;               //将当前environment设为对应的e 
 	curenv->env_status=ENV_RUNNING; //修改状态为RUNNING
 	curenv->env_runs++;      //更新计数器值
+	unlock_kernel();
 	lcr3(PADDR(e->env_pgdir));  
 	//将e->env_pgdir装入CR3寄存器,从而切换至该environment对应的地址空间
 	env_pop_tf(&e->env_tf);    //

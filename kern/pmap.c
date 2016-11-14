@@ -214,8 +214,10 @@ mem_init(void)
 	//       overwrite memory.  Known as a "guard page".
 	//     Permissions: kernel RW, user NONE
 	// Your code goes here:
-//	cprintf("%x\n",bootstack);
-	boot_map_region(kern_pgdir,KSTACKTOP-KSTKSIZE,ROUNDUP(KSTKSIZE,PGSIZE),PADDR(bootstack),PTE_P|PTE_W);
+	//cprintf("%x\n",bootstack);
+	//存疑,是否要去掉.重复映射 CPU[0]的内核栈 
+
+	//boot_map_region(kern_pgdir,KSTACKTOP-KSTKSIZE,ROUNDUP(KSTKSIZE,PGSIZE),PADDR(bootstack),PTE_P|PTE_W);
 	//根据要求,只需将物理地址映射到虚拟地址[KSTACKTOP-KSTKSIZE,KSTACKTOP]上,权限为PTE_P|PTE_W
 	//////////////////////////////////////////////////////////////////////
 	// Map all of physical memory at KERNBASE.
@@ -298,7 +300,8 @@ mem_init_mp(void)
 	// LAB 4: Your code here:
 	int i=0;
 	for (i=0;i<NCPU;i++)
-	{		
+	{	
+//		cprintf("%08x\n",percpu_kstacks[i]);	
 		boot_map_region(kern_pgdir,KSTACKTOP-i*(KSTKSIZE+KSTKGAP)-KSTKSIZE,KSTKSIZE,PADDR(percpu_kstacks[i]),PTE_W);
 	}
 }
@@ -340,8 +343,8 @@ page_init(void)
 	// NB: DO NOT actually touch the physical memory corresponding to
 	// free pages!
 	size_t i;
-	cprintf("here%08x\n",npages_basemem*PGSIZE);
-	cprintf("%08x\n",boot_alloc(0));
+	//cprintf("here%08x\n",npages_basemem*PGSIZE);
+	//cprintf("%08x\n",boot_alloc(0));
 	for (i = 0; i < npages; i++) {
 		if (i==0)
 		{
@@ -680,7 +683,6 @@ mmio_map_region(physaddr_t pa, size_t size)
 	//
 	// Your code here:
 	size=ROUNDUP(size,PGSIZE);
-//	pa=ROUNDDOWN(pa,PGSIZE);
 	boot_map_region(kern_pgdir,base,size,pa,PTE_PCD|PTE_PWT|PTE_W);
 	base+=size;
 	if (base>=MMIOLIM)
@@ -688,7 +690,6 @@ mmio_map_region(physaddr_t pa, size_t size)
 		panic("exceed the limition!");
 	}
 	return (void *)(base-size);
-//	panic("mmio_map_region not implemented");
 }
 
 static uintptr_t user_mem_check_addr;
