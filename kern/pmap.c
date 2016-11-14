@@ -296,7 +296,11 @@ mem_init_mp(void)
 	//     Permissions: kernel RW, user NONE
 	//
 	// LAB 4: Your code here:
-
+	int i=0;
+	for (i=0;i<NCPU;i++)
+	{		
+		boot_map_region(kern_pgdir,KSTACKTOP-i*(KSTKSIZE+KSTKGAP)-KSTKSIZE,KSTKSIZE,PADDR(percpu_kstacks[i]),PTE_W);
+	}
 }
 
 // --------------------------------------------------------------
@@ -336,6 +340,8 @@ page_init(void)
 	// NB: DO NOT actually touch the physical memory corresponding to
 	// free pages!
 	size_t i;
+	cprintf("here%08x\n",npages_basemem*PGSIZE);
+	cprintf("%08x\n",boot_alloc(0));
 	for (i = 0; i < npages; i++) {
 		if (i==0)
 		{
@@ -343,10 +349,18 @@ page_init(void)
 			pages[i].pp_link=NULL;
 		}
 		else if (i<npages_basemem)
-		{		
+		{	
+			if (i==MPENTRY_PADDR/PGSIZE)
+			{
+				pages[i].pp_ref=1;
+				pages[i].pp_link=page_free_list;
+			}
+			else 
+			{		
 			pages[i].pp_ref=0;                 //将[PGSIZE,npages_basemem*PGSIZE)物理内存对应的页,即第1页到npages_basemem-1页
 			pages[i].pp_link=page_free_list;   //设为可用,同时维护page_free_list链表
 			page_free_list=&pages[i];		
+			}
 		}
 		else if (i<(((uint32_t) boot_alloc(0)-KERNBASE)>>PGSHIFT))  //通过调用boot_alloc(0)来查看当前下一个可用页面的地址
 		{							    //减去KERNBASE转化为物理地址,通过右移PGSHIFT(12)位获得页号
@@ -665,7 +679,16 @@ mmio_map_region(physaddr_t pa, size_t size)
 	// Hint: The staff solution uses boot_map_region.
 	//
 	// Your code here:
-	panic("mmio_map_region not implemented");
+	size=ROUNDUP(size,PGSIZE);
+//	pa=ROUNDDOWN(pa,PGSIZE);
+	boot_map_region(kern_pgdir,base,size,pa,PTE_PCD|PTE_PWT|PTE_W);
+	base+=size;
+	if (base>=MMIOLIM)
+	{
+		panic("exceed the limition!");
+	}
+	return (void *)(base-size);
+//	panic("mmio_map_region not implemented");
 }
 
 static uintptr_t user_mem_check_addr;
