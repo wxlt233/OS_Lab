@@ -120,7 +120,7 @@ fork(void)
 	}
 	if (envid<0)
 		panic("sys_exofork failed!");
-	uint32_t i=0;
+	uint32_t  i=0;
 	for (i=0;i<USTACKTOP;i+=PGSIZE)
 	{
 		if ((uvpd[PDX(i)]&PTE_P)&&(uvpt[PGNUM(i)]&PTE_P)&&(uvpt[PGNUM(i)]&PTE_U))
