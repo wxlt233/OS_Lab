@@ -406,7 +406,7 @@ page_fault_handler(struct Trapframe *tf)
 		utrapframe->utf_eflags=tf->tf_eflags;
 		utrapframe->utf_esp=tf->tf_esp;	
 
-		cprintf("curenv :%08x tf %08x\n",&curenv->env_tf,tf);
+//		cprintf("curenv :%08x tf %08x\n",&curenv->env_tf,tf);
 		curenv->env_tf.tf_eip=(uint32_t) curenv->env_pgfault_upcall;
 		curenv->env_tf.tf_esp=utrapframeaddr;
 		env_run(curenv);
