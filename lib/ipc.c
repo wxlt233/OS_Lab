@@ -68,7 +68,10 @@ ipc_send(envid_t to_env, uint32_t val, void *pg, int perm)
 		if (t==0)
 			break;
 		if (t!=-E_IPC_NOT_RECV)
+		{	
+			cprintf("%e\n",t);	
 			panic("not ipc not recv!");
+		}
 		sys_yield();
 	}
 //	panic("ipc_send not implemented");

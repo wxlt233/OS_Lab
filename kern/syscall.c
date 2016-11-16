@@ -331,7 +331,19 @@ sys_ipc_try_send(envid_t envid, uint32_t value, void *srcva, unsigned perm)
 			return -E_INVAL;
 		if ((uintptr_t)e->env_ipc_dstva<UTOP)
 		{
-			t=sys_page_map(curenv->env_id,srcva,envid,e->env_ipc_dstva,perm);
+			
+			if ((perm&(PTE_P|PTE_U))!=(PTE_P|PTE_U))
+				return -E_INVAL;
+			if ((perm&(~PTE_P)&(~PTE_U)&(~PTE_AVAIL)&(~PTE_W))!=0)
+				return -E_INVAL;
+
+			pte_t *pagetableentry;
+			struct PageInfo *tpage=page_lookup(curenv->env_pgdir,srcva,&pagetableentry);
+			if (!tpage)
+				return -E_INVAL;
+			if (((*pagetableentry&PTE_W)==0)&&(perm&PTE_W))
+				return -E_INVAL;
+			t=page_insert(e->env_pgdir,tpage,e->env_ipc_dstva,perm);
 			if (t)
 				return t;
 			e->env_ipc_perm=perm;
