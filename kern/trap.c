@@ -100,6 +100,22 @@ trap_init(void)
 		
 	void handler48();
 
+	void irqhandler0();
+	void irqhandler1();	
+	void irqhandler2();
+	void irqhandler3();
+	void irqhandler4();
+	void irqhandler5();
+	void irqhandler6();
+	void irqhandler7();
+	void irqhandler8();
+	void irqhandler9();
+	void irqhandler10();
+	void irqhandler11();
+	void irqhandler12();
+	void irqhandler13();
+	void irqhandler14();
+	void irqhandler15();
 	//使用SETGATE填写对应的中断向量表IDT,参数分别为要填写的IDT表项, 是否为trap,
 	//段选择符GD_KT(内核代码段),对应函数地址及DPL
 	SETGATE(idt[0],0,GD_KT,handler0,0); 
@@ -123,6 +139,24 @@ trap_init(void)
 	SETGATE(idt[17],0,GD_KT,handler17,0);
 	SETGATE(idt[18],0,GD_KT,handler18,0);
 	SETGATE(idt[19],0,GD_KT,handler19,0);
+	
+	SETGATE(idt[32],0,GD_KT,irqhandler0,0);
+	SETGATE(idt[33],0,GD_KT,irqhandler1,0);
+	SETGATE(idt[34],0,GD_KT,irqhandler2,0);
+	SETGATE(idt[35],0,GD_KT,irqhandler3,0);
+	SETGATE(idt[36],0,GD_KT,irqhandler4,0);
+	SETGATE(idt[37],0,GD_KT,irqhandler5,0);
+	SETGATE(idt[38],0,GD_KT,irqhandler6,0);
+	SETGATE(idt[39],0,GD_KT,irqhandler7,0);
+	SETGATE(idt[40],0,GD_KT,irqhandler8,0);
+	SETGATE(idt[41],0,GD_KT,irqhandler9,0);
+	SETGATE(idt[42],0,GD_KT,irqhandler10,0);
+	SETGATE(idt[43],0,GD_KT,irqhandler11,0);
+	SETGATE(idt[44],0,GD_KT,irqhandler12,0);
+	SETGATE(idt[45],0,GD_KT,irqhandler13,0);
+	SETGATE(idt[46],0,GD_KT,irqhandler14,0);
+	SETGATE(idt[47],0,GD_KT,irqhandler15,0);
+
 
 	SETGATE(idt[48],0,GD_KT,handler48,3);
 	// Per-CPU setup 
@@ -245,9 +279,13 @@ trap_dispatch(struct Trapframe *tf)
 	// Handle clock interrupts. Don't forget to acknowledge the
 	// interrupt using lapic_eoi() before calling the scheduler!
 	// LAB 4: Your code here.
-
-//=======
-	if (tf->tf_trapno==T_PGFLT)  //如果是page fault,分配给对应的page_fault_handler函数进行处理
+	if (tf->tf_trapno==IRQ_OFFSET+IRQ_TIMER)
+	{
+		lapic_eoi();
+		sched_yield();
+		return ;
+	}
+	else if (tf->tf_trapno==T_PGFLT)  //如果是page fault,分配给对应的page_fault_handler函数进行处理
 	{
 		page_fault_handler(tf);	
 		return;

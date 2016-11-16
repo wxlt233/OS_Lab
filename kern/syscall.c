@@ -319,7 +319,30 @@ static int
 sys_ipc_try_send(envid_t envid, uint32_t value, void *srcva, unsigned perm)
 {
 	// LAB 4: Your code here.
-	panic("sys_ipc_try_send not implemented");
+	struct Env *e;
+	int t=envid2env(envid,&e,0);
+	if (t)
+		return -E_BAD_ENV;
+	if (e->env_ipc_recving==0)
+		return  -E_IPC_NOT_RECV;
+	if ((uintptr_t)srcva<UTOP)
+	{
+		if ((uintptr_t )srcva%PGSIZE!=0)
+			return -E_INVAL;
+		if ((uintptr_t)e->env_ipc_dstva<UTOP)
+		{
+			t=sys_page_map(curenv->env_id,srcva,envid,e->env_ipc_dstva,perm);
+			if (t)
+				return t;
+			e->env_ipc_perm=perm;
+		}
+	}
+	e->env_ipc_recving=0;
+	e->env_ipc_from=curenv->env_id;
+	e->env_ipc_value=value;
+	e->env_tf.tf_regs.reg_eax=0;
+	e->env_status=ENV_RUNNABLE;
+	return 0;
 }
 
 // Block until a value is ready.  Record that you want to receive
@@ -337,7 +360,12 @@ static int
 sys_ipc_recv(void *dstva)
 {
 	// LAB 4: Your code here.
-	panic("sys_ipc_recv not implemented");
+	if (((uintptr_t)dstva<UTOP)&&((uintptr_t)dstva%PGSIZE!=0))
+		return -E_INVAL;
+	curenv->env_ipc_recving=1;
+	curenv->env_ipc_dstva=dstva;
+	curenv->env_status=ENV_NOT_RUNNABLE;
+	sched_yield();	
 	return 0;
 }
 
@@ -386,6 +414,12 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 		break;
 	case SYS_env_set_pgfault_upcall:
 		ret=sys_env_set_pgfault_upcall(a1,(void *)a2);
+		break;
+	case SYS_ipc_recv:
+		ret=sys_ipc_recv((void *)a1);
+		break;
+	case SYS_ipc_try_send:
+		ret=sys_ipc_try_send(a1,a2,(void *)a3,a4);
 		break;
 	default: 
 		return -E_INVAL; //如果没有匹配的系统调用号,返回-E_INVAL
