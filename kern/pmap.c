@@ -301,8 +301,9 @@ mem_init_mp(void)
 	int i=0;
 	for (i=0;i<NCPU;i++)
 	{	
-//		cprintf("%08x\n",percpu_kstacks[i]);	
 		boot_map_region(kern_pgdir,KSTACKTOP-i*(KSTKSIZE+KSTKGAP)-KSTKSIZE,KSTKSIZE,PADDR(percpu_kstacks[i]),PTE_W);
+		//使用boot_map_region,为各个CPU分配内核栈,CPU i的内核栈从高地址KSTACKTOP-i*(KSTKSIZE+KSTKGAP)开始
+		//大小为KSTKSIZE,KSTKGAP为各个内核栈之间的保护区域,没有物理内存映射到该区域
 	}
 }
 
@@ -682,14 +683,19 @@ mmio_map_region(physaddr_t pa, size_t size)
 	// Hint: The staff solution uses boot_map_region.
 	//
 	// Your code here:
-	size=ROUNDUP(size,PGSIZE);
+	size=ROUNDUP(size,PGSIZE);   //将size向上取整,使其为PGSIZE的倍数
+	
 	boot_map_region(kern_pgdir,base,size,pa,PTE_PCD|PTE_PWT|PTE_W);
-	base+=size;
-	if (base>=MMIOLIM)
+	
+	//使用boot_map_region将物理地址pa开始的size映射到base开始的虚拟地址
+	//其中标志位需要设置为PTE_PCD,PTE_PWT,从而让CPU对于此块访问时不使用cache且采用write-through
+	
+	base+=size;         //修改base
+	if (base>=MMIOLIM)  //如果超过了给定的界限MMIOLIM,panic
 	{
 		panic("exceed the limition!");
 	}
-	return (void *)(base-size);
+	return (void *)(base-size);  //根据要求,返回本次分配起始的虚拟地址
 }
 
 static uintptr_t user_mem_check_addr;

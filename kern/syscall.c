@@ -86,11 +86,14 @@ sys_exofork(void)
 	// LAB 4: Your code here.
 	struct Env *e;
 	int t=env_alloc(&e,curenv->env_id);
-	if (t)
+	//使用env_alloc分配一个新的environment
+	
+	if (t)   //如果返回值不为0,说明出错,返回对应的错误信息
 		return t;
-	e->env_status=ENV_NOT_RUNNABLE;
-	e->env_tf=curenv->env_tf;
-	e->env_tf.tf_regs.reg_eax=0;
+	
+	e->env_status=ENV_NOT_RUNNABLE;//设置新的environment状态为不可运行
+	e->env_tf=curenv->env_tf; //复制当前environment的寄存器组值至新的environement
+	e->env_tf.tf_regs.reg_eax=0;//将新的environment中的eax寄存器设为0,从而使运行该
 	return e->env_id;
 //	panic("sys_exofork not implemented");
 }
@@ -112,11 +115,11 @@ sys_env_set_status(envid_t envid, int status)
 	// envid's status.
 	
 	// LAB 4: Your code here.
-	if (status!=ENV_RUNNABLE&&status!=ENV_NOT_RUNNABLE)
+	if (status!=ENV_RUNNABLE&&status!=ENV_NOT_RUNNABLE)//检查参数
 		return -E_INVAL;
 	struct Env *e;
 	int t=envid2env(envid,&e,1);
-	if (t)
+	if (t)      //如果返回值不为0,说ing该envid无效,返回-E_BAD_ENV
 		return -E_BAD_ENV;
 	e->env_status=status;
 	return 0;
@@ -136,15 +139,12 @@ sys_env_set_status(envid_t envid, int status)
 static int
 sys_env_set_pgfault_upcall(envid_t envid, void *func)
 {
-	// LAB 4: Your code here.
 	struct Env *e;
-	int t=envid2env(envid,&e,1);
+	int t=envid2env(envid,&e,1); //将envid转换为struct Env *
 	if (t)
 		return -E_BAD_ENV;
-	e->env_pgfault_upcall=func;
+	e->env_pgfault_upcall=func; //将env_pgfault_upcall设为对应的函数
 	return 0;
-
-//	panic("sys_env_set_pgfault_upcall not implemented");
 }
 
 // Allocate a page of memory and map it at 'va' with permission
@@ -175,21 +175,23 @@ sys_page_alloc(envid_t envid, void *va, int perm)
 
 	// LAB 4: Your code here.
 	struct Env * e;
-	int t=envid2env(envid,&e,1);
+	int t=envid2env(envid,&e,1);//使用envid2env将envid转化为struct Env *
 	if (t)
-		return -E_BAD_ENV;
-	if ((perm&(PTE_P|PTE_U))!=(PTE_P|PTE_U))
+		return -E_BAD_ENV;        //无效environment id
+	if ((perm&(PTE_P|PTE_U))!=(PTE_P|PTE_U)) //根据要求检查标志位
 		return -E_INVAL;
-	if ((uint32_t)va>=UTOP||((uint32_t) va)%PGSIZE!=0)
+	if ((uint32_t)va>=UTOP||((uint32_t) va)%PGSIZE!=0) //检查va是否大于UTOP或为对齐
 		return -E_INVAL;
-	if ((perm&(~PTE_P)&(~PTE_U)&(~PTE_AVAIL)&(~PTE_W))!=0)
+	if ((perm&(~PTE_P)&(~PTE_U)&(~PTE_AVAIL)&(~PTE_W))!=0)//根据要求检查标志位
 		return -E_INVAL;
 	struct PageInfo * papage;
-	papage=page_alloc(ALLOC_ZERO);
-	if (papage==NULL)
+	papage=page_alloc(ALLOC_ZERO);  //分配一个新页
+	if (papage==NULL)    //如果返回NULL,说明没有足够内存,返回-E_NO_MEN
 		return -E_NO_MEM;
 	t=page_insert(e->env_pgdir,papage,va,perm);
-	if (t)
+	//将该页插入envid对应的environment的地址空间中虚拟地址va处
+	
+	if (t)   //如果返回值不为0,插入出错,释放之前分配的页,同时返回对应的错误信息      
 	{
 		page_free(papage);
 		return t;
@@ -223,35 +225,36 @@ sys_page_map(envid_t srcenvid, void *srcva,
 	//   parameters for correctness.
 	//   Use the third argument to page_lookup() to
 	//   check the current permissions on the page.
-
 	// LAB 4: Your code here.
 	struct Env *srcenv,*dstenv;
-	int t=envid2env(srcenvid,&srcenv,1);
+	int t=envid2env(srcenvid,&srcenv,1);//检查是否有无效envid
 	if (t)
 		return -E_BAD_ENV;
 	t=envid2env(dstenvid,&dstenv,1);
 	if (t)
 		return -E_BAD_ENV;
-	if ((uint32_t)srcva>=UTOP||((uint32_t) srcva)%PGSIZE!=0)
+	if ((uint32_t)srcva>=UTOP||((uint32_t) srcva)%PGSIZE!=0) //检查srcva和dstva
 		return -E_INVAL;
 	if ((uint32_t)dstva>=UTOP||((uint32_t) dstva)%PGSIZE!=0)
 		return -E_INVAL;
-	if ((perm&(PTE_P|PTE_U))!=(PTE_P|PTE_U))
+	if ((perm&(PTE_P|PTE_U))!=(PTE_P|PTE_U))   //检查标志位
 		return -E_INVAL;
 	if ((perm&(~PTE_P)&(~PTE_U)&(~PTE_AVAIL)&(~PTE_W))!=0)
 		return -E_INVAL;
 
 	pte_t *pagetableentry;
 	struct PageInfo *tpage=page_lookup(srcenv->env_pgdir,srcva,&pagetableentry);
-	if (!tpage)
+	
+	//在源environment中查找srcva对应的页
+	
+	if (!tpage)   //如果srcva对应的页不在源environment的地址空间中,返回-E_INVAL
 		return -E_INVAL;
-	if (((*pagetableentry&PTE_W)==0)&&(perm&PTE_W))
+	if (((*pagetableentry&PTE_W)==0)&&(perm&PTE_W)) //如果将只读页映射为可写页,返回-E_INVAL
 		return -E_INVAL;
-	t=page_insert(dstenv->env_pgdir,tpage,dstva,perm);
-	if (t)
+	t=page_insert(dstenv->env_pgdir,tpage,dstva,perm);//在目的environment中插入该页
+	if (t)    //若插入失败,说明内存不足,返回-E_NO_MEM
 		return -E_NO_MEM;
 	return 0;
-
 }
 
 // Unmap the page of memory at 'va' in the address space of 'envid'.
@@ -267,13 +270,13 @@ sys_page_unmap(envid_t envid, void *va)
 	// Hint: This function is a wrapper around page_remove().
 
 	// LAB 4: Your code here.
-	struct Env *e;
-	int t=envid2env(envid,&e,1);
-	if (t)
+	struct Env *e;                  
+	int t=envid2env(envid,&e,1); //将envid装换为对应的environment
+	if (t)                    //如果返回值不为0,无效envid,返回-E_BAD_ENV
 		return -E_BAD_ENV;
-	if ((uint32_t) va >=UTOP||(uint32_t)va%PGSIZE!=0)
+	if ((uint32_t) va >=UTOP||(uint32_t)va%PGSIZE!=0) //检查va
 		return -E_INVAL;
-	page_remove(e->env_pgdir,va);
+	page_remove(e->env_pgdir,va); //取消对应的映射
 	return 0;	
 }
 
@@ -323,37 +326,47 @@ sys_ipc_try_send(envid_t envid, uint32_t value, void *srcva, unsigned perm)
 	int t=envid2env(envid,&e,0);
 	if (t)
 		return -E_BAD_ENV;
-	if (e->env_ipc_recving==0)
-		return  -E_IPC_NOT_RECV;
-	if ((uintptr_t)srcva<UTOP)
+	if (e->env_ipc_recving==0)   //如果对应的environment没有在接受信息
+		return  -E_IPC_NOT_RECV; //返回-E_PIC_NOT_RECV
+	if ((uintptr_t)srcva<UTOP) //如果srcva<UTOP,表示该environment试图发送一个页
 	{
 		if ((uintptr_t )srcva%PGSIZE!=0)
 			return -E_INVAL;
-		if ((uintptr_t)e->env_ipc_dstva<UTOP)
+		if ((uintptr_t)e->env_ipc_dstva<UTOP) 
+		//如果目标environment的dstva<UTOP,表明需要发送一个页
 		{
 			
-			if ((perm&(PTE_P|PTE_U))!=(PTE_P|PTE_U))
+			//此处不能直接使用sys_page_map,因为sys_page_map会检查对应权限
+			//从而出错
+			if ((perm&(PTE_P|PTE_U))!=(PTE_P|PTE_U))//检查标志位
 				return -E_INVAL;
 			if ((perm&(~PTE_P)&(~PTE_U)&(~PTE_AVAIL)&(~PTE_W))!=0)
 				return -E_INVAL;
 
 			pte_t *pagetableentry;
 			struct PageInfo *tpage=page_lookup(curenv->env_pgdir,srcva,&pagetableentry);
-			if (!tpage)
-				return -E_INVAL;
-			if (((*pagetableentry&PTE_W)==0)&&(perm&PTE_W))
-				return -E_INVAL;
+			//使用page_lookup在当前environment查找srcva对应的页
+			if (!tpage)  //如果当前srcva不在该environment的地址空间中
+				return -E_INVAL;//返回-E_INVAL
+			if (((*pagetableentry&PTE_W)==0)&&(perm&PTE_W))//如果试图将只读页作为可写页发送
+				return -E_INVAL;                       //返回-E_INVAL
 			t=page_insert(e->env_pgdir,tpage,e->env_ipc_dstva,perm);
+			//将该页插入目的environment的地址空间中
 			if (t)
 				return t;
-			e->env_ipc_perm=perm;
+			e->env_ipc_perm=perm; //设置ipc_perm标志位
 		}
 	}
-	e->env_ipc_recving=0;
+	e->env_ipc_recving=0;  
+	//目标environment已接收到信息,所以将其ipc_recving设为0,表示不再继续接收
 	e->env_ipc_from=curenv->env_id;
+	//ipc_from设为当前environment
 	e->env_ipc_value=value;
+	//对应接收的值
 	e->env_tf.tf_regs.reg_eax=0;
+	//将目的environment的regs_eax设为0,从而让目的environment的sys_ipc_recv"返回"0
 	e->env_status=ENV_RUNNABLE;
+	//目标进程可以继续运行
 	return 0;
 }
 
@@ -372,12 +385,13 @@ static int
 sys_ipc_recv(void *dstva)
 {
 	// LAB 4: Your code here.
-	if (((uintptr_t)dstva<UTOP)&&((uintptr_t)dstva%PGSIZE!=0))
+	if (((uintptr_t)dstva<UTOP)&&((uintptr_t)dstva%PGSIZE!=0)) 
+	//检查dstva
 		return -E_INVAL;
-	curenv->env_ipc_recving=1;
+	curenv->env_ipc_recving=1;//将ipc_recving设为1,表明在接收
 	curenv->env_ipc_dstva=dstva;
-	curenv->env_status=ENV_NOT_RUNNABLE;
-	sched_yield();	
+	curenv->env_status=ENV_NOT_RUNNABLE;//将当前environment状态设为不可运行
+	sched_yield();	 //使用sched_yield让cpu运行其他可运行的environment
 	return 0;
 }
 

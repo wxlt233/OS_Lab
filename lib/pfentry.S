@@ -65,24 +65,24 @@ _pgfault_upcall:
 	// ways as registers become unavailable as scratch space.
 	//
 	// LAB 4: Your code here.
-	movl  0x28(%esp),%edx
-	subl  $4,0x30(%esp)
-	movl 0x30(%esp),%eax
-	movl %edx,(%eax)
-	addl $0x8,%esp
+	movl  0x28(%esp),%edx     //esp+40对应的UTrapframe结构体中的utf_eip,即发生page fault时的指令地址
+	subl  $4,0x30(%esp)       //esp
+	movl 0x30(%esp),%eax     
+	movl %edx,(%eax)       
+	addl $0x8,%esp            //将esp加8,跳过对返回时无用的utf_fault_va和utf_err
 	// Restore the trap-time registers.  After you do this, you
 	// can no longer modify any general-purpose registers.
 	// LAB 4: Your code here.
-	popal
+	popal                    //弹出8个通用寄存器
 	// Restore eflags from the stack.  After you do this, you can
 	// no longer use arithmetic operations or anything else that
 	// modifies eflags.
 	// LAB 4: Your code here.
-	addl $0x4,%esp
-	popfl
+	addl $0x4,%esp          //将esp加4,跳过已经取得的eip
+	popfl                   //将发生page fault时的eflags寄存器弹出
 	// Switch back to the adjusted trap-time stack.
 	// LAB 4: Your code here.
-	popl %esp
+	popl %esp               
 	// Return to re-execute the instruction that faulted.
 	// LAB 4: Your code here.
-	ret
+	ret                     //由于此时eip在栈中esp

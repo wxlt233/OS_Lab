@@ -194,24 +194,26 @@ trap_init_percpu(void)
 	// when we trap to the kernel.
 //	ts.ts_iomb = sizeof(struct Taskstate);
 	
-	int i=cpunum();
+	int i=cpunum();       //获取当前CPU的ID
+	
 	thiscpu->cpu_ts.ts_esp0=KSTACKTOP-i*(KSTKSIZE+KSTKGAP);
+	//设置当前CPU内核栈的栈底
 	thiscpu->cpu_ts.ts_ss0=GD_KD;
+	//设置内核栈的段选择符,为内核数据数据段
 	thiscpu->cpu_ts.ts_iomb=sizeof(struct Taskstate);
 	gdt[(GD_TSS0>>3)+i]=SEG16(STS_T32A,(uint32_t)(&(thiscpu->cpu_ts)),sizeof(struct Taskstate)-1,0);
+	//修改初始的框架代码,将ts改为thiscpu->cpu_ts
+	//且当前CPU的TSS选择符在GDT表中的位置为(GD_TSS0>>3)+i
 	gdt[(GD_TSS0>>3)+i].sd_s=0;
 	ltr(GD_TSS0+i*8);	
+	lidt(&idt_pd);
 	// Initialize the TSS slot of the gdt.
-//	gdt[GD_TSS0 >> 3] = SEG16(STS_T32A, (uint32_t) (&ts),
 				//	sizeof(struct Taskstate) - 1, 0);
-//	gdt[GD_TSS0 >> 3].sd_s = 0;
 	
 	// Load the TSS selector (like other segment selectors, the
 	// bottom three bits are special; we leave them 0)
-//	ltr(GD_TSS0);
 
 	// Load the IDT
-	lidt(&idt_pd);
 }
 
 void
@@ -279,10 +281,10 @@ trap_dispatch(struct Trapframe *tf)
 	// Handle clock interrupts. Don't forget to acknowledge the
 	// interrupt using lapic_eoi() before calling the scheduler!
 	// LAB 4: Your code here.
-	if (tf->tf_trapno==IRQ_OFFSET+IRQ_TIMER)
+	if (tf->tf_trapno==IRQ_OFFSET+IRQ_TIMER)  //如果是时钟中断
 	{
 		lapic_eoi();
-		sched_yield();
+		sched_yield(); //使用sched_yield寻找其他可运行的environment运行
 		return ;
 	}
 	else if (tf->tf_trapno==T_PGFLT)  //如果是page fault,分配给对应的page_fault_handler函数进行处理
@@ -422,12 +424,15 @@ page_fault_handler(struct Trapframe *tf)
 	//   (the 'tf' variable points at 'curenv->env_tf').
 
 	// LAB 4: Your code here.
-	if (curenv->env_pgfault_upcall)
+	if (curenv->env_pgfault_upcall) //如果存在对应的page fault upcall
 	{
 		uint32_t utrapframeaddr;
 		if (tf->tf_esp>=UXSTACKTOP-PGSIZE&&tf->tf_esp<=UXSTACKTOP-1)
+		//判断发生page fault使用的user stack 还是 user exception stack
 		{
 			utrapframeaddr=tf->tf_esp-sizeof(struct UTrapframe)-4;
+			//如果已经使用user exception stack,需要向栈中额外压入4字节
+			//用于随后返回
 		}	
 		else 
 		{
@@ -436,7 +441,9 @@ page_fault_handler(struct Trapframe *tf)
 		struct UTrapframe * utrapframe;
 		utrapframe=(struct UTrapframe *) utrapframeaddr;
 		user_mem_assert(curenv,(void *)utrapframeaddr,1,PTE_W);	
-		
+		//检查当前environment对栈的读写权限
+	
+		//根据要求向user exception stack中压入结构UTrapframe	
 		utrapframe->utf_fault_va=fault_va;
 		utrapframe->utf_err=tf->tf_err;
 		utrapframe->utf_regs=tf->tf_regs;
@@ -444,9 +451,11 @@ page_fault_handler(struct Trapframe *tf)
 		utrapframe->utf_eflags=tf->tf_eflags;
 		utrapframe->utf_esp=tf->tf_esp;	
 
-//		cprintf("curenv :%08x tf %08x\n",&curenv->env_tf,tf);
 		curenv->env_tf.tf_eip=(uint32_t) curenv->env_pgfault_upcall;
+		//将curenv->env_tf.tf_eip修改为对应env_pgfault_upcall的地址
+		//从而env_run后开始执行对应的page fault handler
 		curenv->env_tf.tf_esp=utrapframeaddr;
+		//同理,修改对应esp
 		env_run(curenv);
 	}	
 

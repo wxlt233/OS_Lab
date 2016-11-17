@@ -570,6 +570,5 @@ env_run(struct Env *e)
 	lcr3(PADDR(e->env_pgdir));  
 	//将e->env_pgdir装入CR3寄存器,从而切换至该environment对应的地址空间
 	env_pop_tf(&e->env_tf);    //
-//	panic("env_run not yet implemented");
 }
 

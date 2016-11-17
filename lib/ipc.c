@@ -28,22 +28,21 @@ ipc_recv(envid_t *from_env_store, void *pg, int *perm_store)
 	if (from_env_store)
 		*from_env_store=0;
 	int t;
-	if (pg!=NULL)
+	if (pg!=NULL)        //如果pg不为NULL,则将其作为dstva传入sys_ipc_recv
 		 t=sys_ipc_recv(pg);
 	else 
-		t=sys_ipc_recv((void*)UTOP);
+		t=sys_ipc_recv((void*)UTOP);//否则传入一个>=UTOP的值,sys_ipc_recv则当作不接收页来处理
 	if (t)	
 		return t;	
-	if (from_env_store!=NULL)
-	{
-		*from_env_store=thisenv->env_ipc_from;
+	if (from_env_store!=NULL) //如果from_env_store不为NULL
+	{ 
+		*from_env_store=thisenv->env_ipc_from;//将发送信息的environment的envid存在*from_env_store
 	}
-	if (perm_store)
+	if (perm_store) //如果perm_store不为NULL
 	{
-		*perm_store=thisenv->env_ipc_perm;
+		*perm_store=thisenv->env_ipc_perm;//将对应的标志位传入*perm_store
 	}
-//	panic("ipc_recv not implemented");
-	return thisenv->env_ipc_value;
+	return thisenv->env_ipc_value;   //返回IPC传送的值
 }
 
 // Send 'val' (and 'pg' with 'perm', if 'pg' is nonnull) to 'toenv'.
@@ -58,23 +57,24 @@ void
 ipc_send(envid_t to_env, uint32_t val, void *pg, int perm)
 {
 	// LAB 4: Your code here.
-	int t;
-	while (1)
+	int t; 
+	while (1)        //不断尝试发送
 	{
-		if (pg!=NULL)
+		if (pg!=NULL) //如果pg不为NULL
 			t=sys_ipc_try_send(to_env,val,pg,perm);
+			//传送值val,页pg,标志位perm给目的environment to_env
 		else 
 			t=sys_ipc_try_send(to_env,val,(void *)UTOP,0);
-		if (t==0)
+			//否则仅传送值val
+		if (t==0) //如果t==0,说明传送成功,退出
 			break;
-		if (t!=-E_IPC_NOT_RECV)
+		if (t!=-E_IPC_NOT_RECV) //假设出错且不为-E_IPC_NOT_RECV,panic
 		{	
 			cprintf("%e\n",t);	
 			panic("not ipc not recv!");
 		}
-		sys_yield();
+		sys_yield(); //使用sys_yield进行CPU调度,运行其他可运行的environment
 	}
-//	panic("ipc_send not implemented");
 }
 
 // Find the first environment of the given type.  We'll use this to
