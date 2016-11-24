@@ -29,7 +29,29 @@ sched_yield(void)
 	// below to halt the cpu.
 
 	// LAB 4: Your code here.
-
+	int i,cur=0;
+	if (curenv)    //如果有environment正在当前CPU上运行
+	{
+		cur=ENVX(curenv->env_id);//获取该environment的ID
+	}	
+	else 
+	{	
+		cur=0;   //否则将cur设为0
+	}
+	for (i=0;i<NENV;i++) //从当前正在运行的environment或者0遍历envs数组
+	{
+		int j=(cur+i)%NENV;          
+		if (envs[j].env_status==ENV_RUNNABLE)//如果有可以运行的environment
+		{
+			env_run(envs+j); //运行该environment
+		}
+	}	
+	if (curenv&&curenv->env_status==ENV_RUNNING)
+	//如果没有其他可以运行的进程,且之前在该CPU上运行的environment仍是running状态
+	//继续运行该environment
+	{
+		env_run(curenv);
+	}
 	// sched_halt never returns
 	sched_halt();
 }

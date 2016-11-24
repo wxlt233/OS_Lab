@@ -65,6 +65,11 @@ static const char *trapname(int trapno)
 	return "(unknown trap)";
 }
 
+void test()
+{
+	cprintf("hahah");
+}
+
 
 void
 trap_init(void)
@@ -72,7 +77,88 @@ trap_init(void)
 	extern struct Segdesc gdt[];
 
 	// LAB 3: Your code here.
+	void handler0();
+	void handler1();
+	void handler2();
+	void handler3();
+	void handler4();
+	void handler5();
+	void handler6();
+	void handler7();
+	void handler8();
+//	void handler9();
+	void handler10();
+	void handler11();
+	void handler12();
+	void handler13();
+	void handler14();
+//	void handler15();
+	void handler16();
+	void handler17();
+	void handler18();
+	void handler19();
+		
+	void handler48();
 
+	void irqhandler0();
+	void irqhandler1();	
+	void irqhandler2();
+	void irqhandler3();
+	void irqhandler4();
+	void irqhandler5();
+	void irqhandler6();
+	void irqhandler7();
+	void irqhandler8();
+	void irqhandler9();
+	void irqhandler10();
+	void irqhandler11();
+	void irqhandler12();
+	void irqhandler13();
+	void irqhandler14();
+	void irqhandler15();
+	//使用SETGATE填写对应的中断向量表IDT,参数分别为要填写的IDT表项, 是否为trap,
+	//段选择符GD_KT(内核代码段),对应函数地址及DPL
+	SETGATE(idt[0],0,GD_KT,handler0,0); 
+	SETGATE(idt[1],0,GD_KT,handler1,0); 
+	SETGATE(idt[2],0,GD_KT,handler2,0);
+	SETGATE(idt[3],0,GD_KT,handler3,3);  
+	//breakpoint对应的DPL应设置为3,从而可以触发breakpoint exception
+	SETGATE(idt[4],0,GD_KT,handler4,0);
+	SETGATE(idt[5],0,GD_KT,handler5,0);
+	SETGATE(idt[6],0,GD_KT,handler6,0);
+	SETGATE(idt[7],0,GD_KT,handler7,0);
+	SETGATE(idt[8],0,GD_KT,handler8,0);
+//	SETGATE(idt[9],0,GD_KT,handler9,0);
+	SETGATE(idt[10],0,GD_KT,handler10,0);
+	SETGATE(idt[11],0,GD_KT,handler11,0);
+	SETGATE(idt[12],0,GD_KT,handler12,0);
+	SETGATE(idt[13],0,GD_KT,handler13,0);
+	SETGATE(idt[14],0,GD_KT,handler14,0);	
+//	SETGATE(idt[15],0,GD_KT,handler15,0);
+	SETGATE(idt[16],0,GD_KT,handler16,0);
+	SETGATE(idt[17],0,GD_KT,handler17,0);
+	SETGATE(idt[18],0,GD_KT,handler18,0);
+	SETGATE(idt[19],0,GD_KT,handler19,0);
+	
+	SETGATE(idt[32],0,GD_KT,irqhandler0,0);
+	SETGATE(idt[33],0,GD_KT,irqhandler1,0);
+	SETGATE(idt[34],0,GD_KT,irqhandler2,0);
+	SETGATE(idt[35],0,GD_KT,irqhandler3,0);
+	SETGATE(idt[36],0,GD_KT,irqhandler4,0);
+	SETGATE(idt[37],0,GD_KT,irqhandler5,0);
+	SETGATE(idt[38],0,GD_KT,irqhandler6,0);
+	SETGATE(idt[39],0,GD_KT,irqhandler7,0);
+	SETGATE(idt[40],0,GD_KT,irqhandler8,0);
+	SETGATE(idt[41],0,GD_KT,irqhandler9,0);
+	SETGATE(idt[42],0,GD_KT,irqhandler10,0);
+	SETGATE(idt[43],0,GD_KT,irqhandler11,0);
+	SETGATE(idt[44],0,GD_KT,irqhandler12,0);
+	SETGATE(idt[45],0,GD_KT,irqhandler13,0);
+	SETGATE(idt[46],0,GD_KT,irqhandler14,0);
+	SETGATE(idt[47],0,GD_KT,irqhandler15,0);
+
+
+	SETGATE(idt[48],0,GD_KT,handler48,3);
 	// Per-CPU setup 
 	trap_init_percpu();
 }
@@ -106,21 +192,28 @@ trap_init_percpu(void)
 
 	// Setup a TSS so that we get the right stack
 	// when we trap to the kernel.
-	ts.ts_esp0 = KSTACKTOP;
-	ts.ts_ss0 = GD_KD;
-	ts.ts_iomb = sizeof(struct Taskstate);
-
+//	ts.ts_iomb = sizeof(struct Taskstate);
+	
+	int i=cpunum();       //获取当前CPU的ID
+	
+	thiscpu->cpu_ts.ts_esp0=KSTACKTOP-i*(KSTKSIZE+KSTKGAP);
+	//设置当前CPU内核栈的栈底
+	thiscpu->cpu_ts.ts_ss0=GD_KD;
+	//设置内核栈的段选择符,为内核数据数据段
+	thiscpu->cpu_ts.ts_iomb=sizeof(struct Taskstate);
+	gdt[(GD_TSS0>>3)+i]=SEG16(STS_T32A,(uint32_t)(&(thiscpu->cpu_ts)),sizeof(struct Taskstate)-1,0);
+	//修改初始的框架代码,将ts改为thiscpu->cpu_ts
+	//且当前CPU的TSS选择符在GDT表中的位置为(GD_TSS0>>3)+i
+	gdt[(GD_TSS0>>3)+i].sd_s=0;
+	ltr(GD_TSS0+i*8);	
+	lidt(&idt_pd);
 	// Initialize the TSS slot of the gdt.
-	gdt[GD_TSS0 >> 3] = SEG16(STS_T32A, (uint32_t) (&ts),
-					sizeof(struct Taskstate) - 1, 0);
-	gdt[GD_TSS0 >> 3].sd_s = 0;
-
+				//	sizeof(struct Taskstate) - 1, 0);
+	
 	// Load the TSS selector (like other segment selectors, the
 	// bottom three bits are special; we leave them 0)
-	ltr(GD_TSS0);
 
 	// Load the IDT
-	lidt(&idt_pd);
 }
 
 void
@@ -174,6 +267,7 @@ trap_dispatch(struct Trapframe *tf)
 {
 	// Handle processor exceptions.
 	// LAB 3: Your code here.
+//<<<<<<< HEAD
 
 	// Handle spurious interrupts
 	// The hardware sometimes raises these because of noise on the
@@ -187,10 +281,40 @@ trap_dispatch(struct Trapframe *tf)
 	// Handle clock interrupts. Don't forget to acknowledge the
 	// interrupt using lapic_eoi() before calling the scheduler!
 	// LAB 4: Your code here.
+//<<<<<<< HEAD
 
 	// Handle keyboard and serial interrupts.
 	// LAB 5: Your code here.
 
+//=======
+	if (tf->tf_trapno==IRQ_OFFSET+IRQ_TIMER)  //如果是时钟中断
+	{
+		lapic_eoi();
+		sched_yield(); //使用sched_yield寻找其他可运行的environment运行
+		return ;
+	}
+	else if (tf->tf_trapno==T_PGFLT)  //如果是page fault,分配给对应的page_fault_handler函数进行处理
+	{
+		page_fault_handler(tf);	
+		return;
+	}
+	else if (tf->tf_trapno==T_BRKPT) //如果是breakpoint,调用monitor
+	{
+		monitor(tf);
+		return;
+	}
+	else if (tf->tf_trapno==T_SYSCALL) //如果是系统调用,调用syscall函数
+	{
+		tf->tf_regs.reg_eax=syscall(tf->tf_regs.reg_eax,tf->tf_regs.reg_edx,tf->tf_regs.reg_ecx,tf->tf_regs.reg_ebx,tf->tf_regs.reg_edi,tf->tf_regs.reg_esi);
+		return;	
+	}
+	else if (tf->tf_trapno==T_DEBUG) //如果是调试异常,调用monitor
+	{
+		monitor(tf);	
+		return;
+	}
+//>>>>>>> lab3
+//>>>>>>> lab4
 	// Unexpected trap: The user process or the kernel has a bug.
 	print_trapframe(tf);
 	if (tf->tf_cs == GD_KT)
@@ -227,8 +351,9 @@ trap(struct Trapframe *tf)
 		// Acquire the big kernel lock before doing any
 		// serious kernel work.
 		// LAB 4: Your code here.
+		lock_kernel();
 		assert(curenv);
-
+		
 		// Garbage collect if current enviroment is a zombie
 		if (curenv->env_status == ENV_DYING) {
 			env_free(curenv);
@@ -272,7 +397,8 @@ page_fault_handler(struct Trapframe *tf)
 	// Handle kernel-mode page faults.
 
 	// LAB 3: Your code here.
-
+	if ((tf->tf_cs&0x11)==0)        //判断上一个trapframe中CS段选择符的RPL,从而判断是否在内核态发生的page fault   
+		panic("kernel page fault");
 	// We've already handled kernel-mode exceptions, so if we get here,
 	// the page fault happened in user mode.
 
@@ -306,6 +432,40 @@ page_fault_handler(struct Trapframe *tf)
 	//   (the 'tf' variable points at 'curenv->env_tf').
 
 	// LAB 4: Your code here.
+	if (curenv->env_pgfault_upcall) //如果存在对应的page fault upcall
+	{
+		uint32_t utrapframeaddr;
+		if (tf->tf_esp>=UXSTACKTOP-PGSIZE&&tf->tf_esp<=UXSTACKTOP-1)
+		//判断发生page fault使用的user stack 还是 user exception stack
+		{
+			utrapframeaddr=tf->tf_esp-sizeof(struct UTrapframe)-4;
+			//如果已经使用user exception stack,需要向栈中额外压入4字节
+			//用于随后返回
+		}	
+		else 
+		{
+			utrapframeaddr=UXSTACKTOP-sizeof(struct UTrapframe);
+		}
+		struct UTrapframe * utrapframe;
+		utrapframe=(struct UTrapframe *) utrapframeaddr;
+		user_mem_assert(curenv,(void *)utrapframeaddr,1,PTE_W);	
+		//检查当前environment对栈的读写权限
+	
+		//根据要求向user exception stack中压入结构UTrapframe	
+		utrapframe->utf_fault_va=fault_va;
+		utrapframe->utf_err=tf->tf_err;
+		utrapframe->utf_regs=tf->tf_regs;
+		utrapframe->utf_eip=tf->tf_eip;
+		utrapframe->utf_eflags=tf->tf_eflags;
+		utrapframe->utf_esp=tf->tf_esp;	
+
+		curenv->env_tf.tf_eip=(uint32_t) curenv->env_pgfault_upcall;
+		//将curenv->env_tf.tf_eip修改为对应env_pgfault_upcall的地址
+		//从而env_run后开始执行对应的page fault handler
+		curenv->env_tf.tf_esp=utrapframeaddr;
+		//同理,修改对应esp
+		env_run(curenv);
+	}	
 
 	// Destroy the environment that caused the fault.
 	cprintf("[%08x] user fault va %08x ip %08x\n",
