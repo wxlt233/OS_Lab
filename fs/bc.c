@@ -105,7 +105,6 @@ check_bc(void)
 	// smash it
 	strcpy(diskaddr(1), "OOPS!\n");
 	flush_block(diskaddr(1));
-	cprintf("%d\n",va_is_mapped(diskaddr(1)));
 	assert(va_is_mapped(diskaddr(1)));
 	assert(!va_is_dirty(diskaddr(1)));
 

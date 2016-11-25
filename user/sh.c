@@ -55,7 +55,8 @@ again:
 			// then close the original 'fd'.
 
 			// LAB 5: Your code here.
-			panic("< redirection not implemented");
+			//panic("< redirection not implemented");
+		//	open(t,)
 			break;
 
 		case '>':	// Output redirection

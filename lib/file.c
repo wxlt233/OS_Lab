@@ -51,7 +51,7 @@ struct Dev devfile =
 // 	The file descriptor index on success
 // 	-E_BAD_PATH if the path is too long (>= MAXPATHLEN)
 // 	< 0 for other errors.
-int
+int 
 open(const char *path, int mode)
 {
 	// Find an unused file descriptor page using fd_alloc.
@@ -141,7 +141,17 @@ devfile_write(struct Fd *fd, const void *buf, size_t n)
 	// remember that write is always allowed to write *fewer*
 	// bytes than requested.
 	// LAB 5: Your code here
-	panic("devfile_write not implemented");
+	int r;
+	fsipcbuf.write.req_fileid=fd->fd_file.id;
+	if (n>PGSIZE-sizeof(int)-sizeof(size_t))
+		fsipcbuf.write.req_n=PGSIZE-sizeof(int)-sizeof(size_t);
+	else 
+		fsipcbuf.write.req_n=n;
+	
+	memmove(fsipcbuf.write.req_buf,buf,fsipcbuf.write.req_n);
+	if ((r=(fsipc(FSREQ_WRITE,NULL)))<0)
+		return r;
+	return r;	
 }
 
 static int

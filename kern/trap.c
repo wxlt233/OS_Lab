@@ -293,6 +293,16 @@ trap_dispatch(struct Trapframe *tf)
 		sched_yield(); //使用sched_yield寻找其他可运行的environment运行
 		return ;
 	}
+	else if (tf->tf_trapno==IRQ_OFFSET+IRQ_KBD)
+	{
+		kbd_intr();
+		return;
+	}
+	else if (tf->tf_trapno==IRQ_OFFSET+IRQ_SERIAL)
+	{
+		serial_intr();
+		return;
+	}
 	else if (tf->tf_trapno==T_PGFLT)  //如果是page fault,分配给对应的page_fault_handler函数进行处理
 	{
 		page_fault_handler(tf);	
