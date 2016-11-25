@@ -426,7 +426,8 @@ page_free(struct PageInfo *pp)
 	// Fill this function in
 	// Hint: You may want to panic if pp->pp_ref is nonzero or
 	// pp->pp_link is not NULL.
-	if (pp->pp_ref!=0||pp->pp_link!=NULL)              //假设当前页的pp_ref为1(仍在使用)或者pp_link!=NULL(未被分配),则发生错误,panic!
+	if (pp->pp_ref!=0)
+	//||pp->pp_link!=NULL)              //假设当前页的pp_ref为1(仍在使用)或者pp_link!=NULL(未被分配),则发生错误,panic!
 	{
 		panic("error");
 	}
