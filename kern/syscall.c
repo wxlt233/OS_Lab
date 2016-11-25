@@ -121,7 +121,6 @@ sys_env_set_status(envid_t envid, int status)
 	return 0;
 	
 	
-//	panic("sys_env_set_status not implemented");
 }
 
 // Set envid's trap frame to 'tf'.

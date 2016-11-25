@@ -323,8 +323,6 @@ trap_dispatch(struct Trapframe *tf)
 		monitor(tf);	
 		return;
 	}
-//>>>>>>> lab3
-//>>>>>>> lab4
 	// Unexpected trap: The user process or the kernel has a bug.
 	print_trapframe(tf);
 	if (tf->tf_cs == GD_KT)

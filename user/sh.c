@@ -56,7 +56,16 @@ again:
 
 			// LAB 5: Your code here.
 			//panic("< redirection not implemented");
-		//	open(t,)
+			fd=open(t,O_RDONLY);
+			if (fd<0)
+				panic("open failed!");
+			if (fd!=0)
+			{
+				dup(fd,0);	
+				int t=close(fd);
+				if (t)
+					panic("close failed!");
+			}
 			break;
 
 		case '>':	// Output redirection
