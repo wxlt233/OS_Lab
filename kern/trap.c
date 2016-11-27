@@ -203,7 +203,7 @@ trap_init_percpu(void)
 	thiscpu->cpu_ts.ts_iomb=sizeof(struct Taskstate);
 	gdt[(GD_TSS0>>3)+i]=SEG16(STS_T32A,(uint32_t)(&(thiscpu->cpu_ts)),sizeof(struct Taskstate)-1,0);
 	//修改初始的框架代码,将ts改为thiscpu->cpu_ts
-	//且当前CPU的TSS选择符在GDT表中的位置为(GD_TSS0>>3)+i
+	//且当前CPU的TSS描述符在GDT表中的位置为(GD_TSS0>>3)+i
 	gdt[(GD_TSS0>>3)+i].sd_s=0;
 	ltr(GD_TSS0+i*8);	
 	lidt(&idt_pd);
