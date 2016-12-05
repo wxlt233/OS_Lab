@@ -63,16 +63,16 @@ alloc_block(void)
 
 	// LAB 5: Your code here.
 	int blockno;
-	for (blockno=0;blockno<super->s_nblocks;blockno++)
+	for (blockno=0;blockno<super->s_nblocks;blockno++)//遍历所有磁盘块
 	{
-		if (block_is_free(blockno))
+		if (block_is_free(blockno))//如果该磁盘块空闲
 		{
-			bitmap[blockno/32]^=(1<<(blockno%32));
-			flush_block(bitmap);
-			return blockno;
+			bitmap[blockno/32]^=(1<<(blockno%32));//将blockno对应的bit清0
+			flush_block(bitmap); //将bitmap对应的,修改过的磁盘块写回磁盘
+			return blockno;//返回磁盘块
 		}
 	}
-	return -E_NO_DISK;
+	return -E_NO_DISK;//若运行到此,说明没有可用的磁盘块,返回-E_NO_DISK
 }
 
 // Validate the file system bitmap.
@@ -144,28 +144,30 @@ static int
 file_block_walk(struct File *f, uint32_t filebno, uint32_t **ppdiskbno, bool alloc)
 {
        // LAB 5: Your code here.
-	if (filebno>=NDIRECT+NINDIRECT)
+	if (filebno>=NDIRECT+NINDIRECT) //如果filebno是否大于一个文件最大的磁盘块数
 		return -E_INVAL;
-	if (filebno<NDIRECT)
+	if (filebno<NDIRECT)         //若小于NDIRECT,则直接取FILE结构体中对应的指针即可
 	{
 		if (ppdiskbno)
-		*ppdiskbno=f->f_direct+filebno;
+		*ppdiskbno=f->f_direct+filebno;//将对应指针存在ppdiskbno中
 		return 0;
 	}
 	if (!alloc&&!f->f_indirect)
-		return -E_NOT_FOUND;
+		return -E_NOT_FOUND; 
+	//若filebno较大,需要另一个磁盘块存储,但目前尚未分配该磁盘块,且alloc=0,返回-E_NOT_FOUND
 	
-	if (!f->f_indirect)
+	if (!f->f_indirect) //若alloc=1,且未分配indirect block
 	{
-		int r=alloc_block();
-		if (r<0) 
+		int r=alloc_block();//分配一个磁盘块
+		if (r<0)            
 			return -E_NO_DISK;
-		f->f_indirect=r;
-		memset(diskaddr(r),0,BLKSIZE);
-		flush_block(diskaddr(r));
+		f->f_indirect=r;       //将f_indirect设为indirect block的磁盘编号
+		memset(diskaddr(r),0,BLKSIZE);//将磁盘块清0
+		flush_block(diskaddr(r)); //做改动后写回
 	}
  	if (ppdiskbno)
 		*ppdiskbno=(uint32_t *) diskaddr(f->f_indirect)+filebno-NDIRECT;
+		//将存储对应磁盘块编号的地址存储在ppdiskbno中
 	return 0;
 }
 
@@ -182,21 +184,20 @@ file_get_block(struct File *f, uint32_t filebno, char **blk)
 {
        // LAB 5: Your code here.
 	uint32_t *test;
-	int t=file_block_walk(f,filebno,&test,1);
+	int t=file_block_walk(f,filebno,&test,1);//调用file_block_walk,alloc位设为1
 	if (t<0)
 		return t;
-	if (*test==0)
+	if (*test==0)//若指针对应的地址中为0,则说明尚未为该文件内的第filebno块分配磁盘块
 	{
-		int r=alloc_block();
+		int r=alloc_block();//分配一个新的磁盘块
 		if (r<0)
 			return -E_NO_DISK;
-		*test=r;
-		memset(diskaddr(r),0,BLKSIZE);
-		flush_block(diskaddr(r));
+		*test=r;            //通过指针修改对应的磁盘编号
+		memset(diskaddr(r),0,BLKSIZE);//将磁盘块清零
+		flush_block(diskaddr(r));//修改后写回
 	}	
-	*blk=diskaddr(*test);
-	return 0;
-	
+	*blk=diskaddr(*test);//调用diskaddr获得给定磁盘块对应的内存地址
+	return 0;	
 }
 
 // Try to find a file named "name" in dir.  If so, set *file to it.

@@ -304,13 +304,14 @@ copy_shared_pages(envid_t child)
 	// LAB 5: Your code here.
 	int i=0;
 	int pan=0;
-	for (i=0;i<0xffffffff;i+=PGSIZE)
+	for (i=0;i<0xffffffff;i+=PGSIZE) //遍历当前environment的所有PTE
 	{
-		if (i==0) pan++;
+		if (i==0) pan++;    //由于0xffffffff再加会导致整数上溢,加此判断
 		if (pan==2) break;
 
-		if ((uvpd[PDX(i)]&PTE_P)&&(uvpt[PGNUM(i)]&PTE_P))
-		if (uvpt[PGNUM(i)]&PTE_SHARE)
+		if ((uvpd[PDX(i)]&PTE_P)&&(uvpt[PGNUM(i)]&PTE_P)) 
+		if (uvpt[PGNUM(i)]&PTE_SHARE) 
+		//如果标志位中有PTE_SHARE,将该页映射至子environment的地址空间中
 		{
 			sys_page_map(0,(void *)i,child,(void *)i,uvpt[PGNUM(i)]&PTE_SYSCALL);
 		}

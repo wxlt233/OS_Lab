@@ -143,15 +143,16 @@ devfile_write(struct Fd *fd, const void *buf, size_t n)
 	// LAB 5: Your code here
 	int r;
 	fsipcbuf.write.req_fileid=fd->fd_file.id;
-	if (n>PGSIZE-sizeof(int)-sizeof(size_t))
+	if (n>PGSIZE-sizeof(int)-sizeof(size_t)) //一次最多写缓冲区大小的字节数
 		fsipcbuf.write.req_n=PGSIZE-sizeof(int)-sizeof(size_t);
 	else 
 		fsipcbuf.write.req_n=n;
 	
 	memmove(fsipcbuf.write.req_buf,buf,fsipcbuf.write.req_n);
-	if ((r=(fsipc(FSREQ_WRITE,NULL)))<0)
+		//将缓冲区中的数据移入fsipcbuf结构体的写缓冲区
+	if ((r=(fsipc(FSREQ_WRITE,NULL)))<0)//发出对应的FSREQ_WRITE请求
 		return r;
-	return r;	
+	return r;	//返回实际写入的字节数
 }
 
 static int

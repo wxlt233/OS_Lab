@@ -29,8 +29,8 @@ va_is_dirty(void *va)
 static void
 bc_pgfault(struct UTrapframe *utf)
 {
-	void *addr = (void *) utf->utf_fault_va;
-	uint32_t blockno = ((uint32_t)addr - DISKMAP) / BLKSIZE;
+	void *addr = (void *) utf->utf_fault_va;    //通过utrapframe结构提中的utf_fault_va获取发生pgfault的地址
+	uint32_t blockno = ((uint32_t)addr - DISKMAP) / BLKSIZE;//找到该地址对应的磁盘块编号
 	int r;
 
 	// Check that the fault was within the block cache region
@@ -48,10 +48,11 @@ bc_pgfault(struct UTrapframe *utf)
 	// the disk.
 	//
 	// LAB 5: you code here:
-	addr=ROUNDDOWN(addr,PGSIZE);
-       if  (sys_page_alloc(0,addr,PTE_W|PTE_U|PTE_P))
+	addr=ROUNDDOWN(addr,PGSIZE); //将addr向下取证,得到该页开始的地址
+       if  (sys_page_alloc(0,addr,PTE_W|PTE_U|PTE_P))//在该environment中为分配一个页,映射在addr处
 		panic("here!");
 	if ((r=ide_read(blockno*BLKSECTS,addr,BLKSECTS)))
+	 //使用ide_read从磁盘中读入blockno对应的磁盘块,读至虚拟地址addr处,注意ide_read是以扇区为单位
 		panic("ide_read failed!");
 	// Clear the dirty bit for the disk block page since we just read the
 	// block from disk
@@ -83,10 +84,11 @@ flush_block(void *addr)
 	// LAB 5: Your code here.
 	addr=ROUNDDOWN(addr,PGSIZE);
 	if (va_is_mapped(addr)&&va_is_dirty(addr))
+	//如果addr在该environment的地址空间中,且dirty位为0,则需要将修改后的结果写会磁盘,否则无需操作
 	{
-		if (ide_write(blockno*BLKSECTS,addr,BLKSECTS))
+		if (ide_write(blockno*BLKSECTS,addr,BLKSECTS)) //将磁盘块写回
 			panic("wrong!")	;
-		if (sys_page_map(0,addr,0,addr,PTE_SYSCALL))
+		if (sys_page_map(0,addr,0,addr,PTE_SYSCALL))//删除对应页的dirty位
 			panic("wrong here!");	
 	}
 	

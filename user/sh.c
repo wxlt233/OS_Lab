@@ -55,13 +55,12 @@ again:
 			// then close the original 'fd'.
 
 			// LAB 5: Your code here.
-			//panic("< redirection not implemented");
-			fd=open(t,O_RDONLY);
+			fd=open(t,O_RDONLY); //将t以只读模式打开
 			if (fd<0)
 				panic("open failed!");
-			if (fd!=0)
+			if (fd!=0)  //假设文件描述符不为0
 			{
-				dup(fd,0);	
+				dup(fd,0);	 //将fd复制到文件描述符0
 				int t=close(fd);
 				if (t)
 					panic("close failed!");

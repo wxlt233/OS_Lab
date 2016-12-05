@@ -217,16 +217,17 @@ serve_read(envid_t envid, union Fsipc *ipc)
 	struct OpenFile *o;
 	int r;
 	if ((r=openfile_lookup(envid,req->req_fileid,&o))<0)
-		return r;
+		return r;        //仿照上面serve_set_size,找到对应的open file
 	int datalength;
-	if (req->req_n>PGSIZE)
+	if (req->req_n>PGSIZE)  
+	//查看inc/fs.h,ipc->readRet中的缓冲区只有PGSIZE个字节,因此一次最多读PGSIZE个字节
 		datalength=PGSIZE;
 	else 
 		datalength=req->req_n;
-	r=file_read(o->o_file,ret->ret_buf,datalength,o->o_fd->fd_offset);
+	r=file_read(o->o_file,ret->ret_buf,datalength,o->o_fd->fd_offset);//调用file_read函数
 	if (r<0) 
 		return r;
-	o->o_fd->fd_offset+=r;
+	o->o_fd->fd_offset+=r;//修正该open file的seek position
 	return r;
 }
 
@@ -244,17 +245,17 @@ serve_write(envid_t envid, struct Fsreq_write *req)
 	// LAB 5: Your code here.
 	struct OpenFile *o;
 	int r;
-	if ((r=openfile_lookup(envid,req->req_fileid,&o))<0)
+	if ((r=openfile_lookup(envid,req->req_fileid,&o))<0)//获取对应的open file
 		return r;
 	int datalength;
-	if (req->req_n>PGSIZE-sizeof(int)-sizeof(size_t))
+	if (req->req_n>PGSIZE-sizeof(int)-sizeof(size_t)) //与serve_read中类似,一次最多写缓冲区大小的字节
 		datalength=PGSIZE-sizeof(int)-sizeof(size_t);
 	else 
 		datalength=req->req_n;
-	r=file_write(o->o_file,req->req_buf,datalength,o->o_fd->fd_offset);
+	r=file_write(o->o_file,req->req_buf,datalength,o->o_fd->fd_offset);//调用file_write
 	if (r<0)
 		return r;
-	o->o_fd->fd_offset+=r;
+	o->o_fd->fd_offset+=r;//修改该 open file的seek position
 	return r;
 }
 

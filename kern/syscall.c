@@ -141,9 +141,9 @@ sys_env_set_trapframe(envid_t envid, struct Trapframe *tf)
 	if (r<0)
 		return -E_BAD_ENV;
 	
-	e->env_tf=*tf;
-	e->env_tf.tf_eflags|=FL_IF;
-	e->env_tf.tf_cs=GD_UT|3;
+	e->env_tf=*tf;             //将该environment的trapframe设为*tf
+	e->env_tf.tf_eflags|=FL_IF; //修改eflags,允许响应中断
+	e->env_tf.tf_cs=GD_UT|3;   //将cs段选择符设为用户程序段,并设置CPL为3
 	return 0;
 		
 }
